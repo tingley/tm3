@@ -12,10 +12,6 @@ import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.MissingOptionException;
 
-import com.globalsight.diplomat.util.database.ConnectionPool;
-import com.globalsight.diplomat.util.database.EnvoyPropertyDataSource;
-import com.globalsight.persistence.hibernate.HibernateUtil;
-
 public class TM3Tool {
 
     private SortedMap<String, Class<? extends TM3Command>> commands =
@@ -49,8 +45,6 @@ public class TM3Tool {
         CommandLineParser parser = new GnuParser();
         try {
             CommandLine cl = parser.parse(command.getOptions(), args);
-            HibernateUtil.initializeForTest();
-            ConnectionPool.initialize(new EnvoyPropertyDataSource().get());
             command.execute(cl, getDefaultProperties());
         }
         catch (MissingOptionException e) {
