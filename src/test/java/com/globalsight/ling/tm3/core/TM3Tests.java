@@ -27,6 +27,8 @@ import org.hibernate.Transaction;
 import org.hibernate.cfg.Configuration;
 import org.junit.Test;
 
+import com.globalsight.ling.tm3.core.persistence.HibernateConfig;
+
 /**
  * Base class for storage testing.
  */
@@ -2984,6 +2986,7 @@ public abstract class TM3Tests {
             throw new RuntimeException(e);
         }
         Configuration cfg = new Configuration().addProperties(props);
+        cfg = HibernateConfig.extendConfiguration(cfg);
         cfg = new TestDataFactory().extendConfiguration(cfg);
         SessionFactory sessionFactory = cfg.buildSessionFactory();
         System.out.println("Hibernate initialization took " + 
