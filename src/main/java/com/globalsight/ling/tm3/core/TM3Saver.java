@@ -30,6 +30,13 @@ public abstract class TM3Saver<T extends TM3Data> {
     }
     
     /**
+     * Resets the saver object.
+     */
+    public void reset() {
+        tus.clear();
+    }
+    
+    /**
      * Add a new TU to this save operation, identified by its 
      * source TUV.  Additional calls may be made to the returned
      * Tu object to add targets TUV, attribute values, etc.

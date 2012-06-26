@@ -470,6 +470,7 @@ abstract class BaseTm<T extends TM3Data> implements TM3Tm<T> {
         catch (SQLException e) {
             throw new TM3Exception(e);
         }
+        saver.reset();
         return saved;
     }
     
