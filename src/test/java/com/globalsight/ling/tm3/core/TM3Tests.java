@@ -7,6 +7,7 @@ import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -2976,18 +2977,12 @@ public abstract class TM3Tests {
     public static SessionFactory setupHibernate() {
         long start = System.currentTimeMillis();
         Properties props = new Properties();
-        // TODO: use build properties
-        props.put("hibernate.dialect", "org.hibernate.dialect.MySQLInnoDBDialect");
-        props.put("hibernate.connection.driver_class", "com.mysql.jdbc.Driver");
-        props.put("hibernate.connection.url", 
-                  "jdbc:mysql://localhost:3306/globalsight_8900?useUnicode=true&characterEncoding=UTF-8");
-        props.put("hibernate.connection.username", "dev");
-        props.put("hibernate.connection.password", "globalsight");
-        props.put("hibernate.cglib.use_reflection_optimizer", "false"); // this is default in hibernate 3.2
-        props.put("hibernate.show_sql", "false");
-        props.put("hibernate.format_sql", "true");
-        // For debug
-        props.put("hibernate.connection.pool_size", "1");
+        try {
+            props.load(TM3Tests.class.getResourceAsStream("/test.properties"));
+        }
+        catch (IOException e) {
+            throw new RuntimeException(e);
+        }
         Configuration cfg = new Configuration().addProperties(props);
         cfg = new TestDataFactory().extendConfiguration(cfg);
         SessionFactory sessionFactory = cfg.buildSessionFactory();
