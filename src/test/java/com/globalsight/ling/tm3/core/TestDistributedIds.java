@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.hibernate.Session;
+import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -17,23 +18,26 @@ import static org.junit.Assert.*;
 import com.globalsight.ling.tm3.core.persistence.DistributedId;
 import com.globalsight.ling.tm3.core.persistence.SQLUtil;
 
-import com.globalsight.persistence.hibernate.HibernateUtil;
-
 public class TestDistributedIds {
 
+    static SessionFactory sessionFactory;
+    
     @BeforeClass
     public static void init() throws Exception {
-        Session session = HibernateUtil.getSession();
-        Statement s = session.connection().createStatement();
+        sessionFactory = TM3Tests.setupHibernate();
+        Session session = sessionFactory.openSession();
+        Connection conn = session.connection();
+        Statement s = conn.createStatement();
         s.execute("DELETE FROM tm3_id where tableName in ('id1', 'testMultipleThreads')");
         s.close();
+        session.close();
     }
     
     @Test
     public void testDistributedIds() throws Exception {
         Session session = null;
         try {
-            session = HibernateUtil.getSession();
+            session = sessionFactory.openSession();
             Connection conn = session.connection();
             DistributedId id1 = new DistributedId("id1", 100);
             // Get some ids
@@ -82,7 +86,7 @@ public class TestDistributedIds {
                 fail("values[" + i + "] was never set");
             }
         }
-        Session session = HibernateUtil.getSession();
+        Session session = sessionFactory.openSession();
         new DistributedId("testMultipleThreads").destroy(session.connection());
     }
     
@@ -101,7 +105,7 @@ public class TestDistributedIds {
         
         @Override
         public void run() {
-            Session session = HibernateUtil.getSession();
+            Session session = sessionFactory.openSession();
             try {
                 Connection conn = session.connection();
                 for (int i = 0; i < count; i++) {

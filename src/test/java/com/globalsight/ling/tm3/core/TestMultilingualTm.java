@@ -10,8 +10,6 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import com.globalsight.persistence.hibernate.HibernateUtil;
-
 public class TestMultilingualTm extends TM3Tests {
 
     @BeforeClass
@@ -22,7 +20,7 @@ public class TestMultilingualTm extends TM3Tests {
     // Set up a bilingual TM for each test, start a fresh hibernate session, etc
     @Before
     public void beforeTest() throws Exception {
-        currentSession = HibernateUtil.getSession();
+        currentSession = sessionFactory.openSession();
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();

@@ -11,8 +11,6 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import com.globalsight.persistence.hibernate.HibernateUtil;
-
 public class TestMultilingualSharedTm extends TM3Tests {
 
     static final long SHARED_STORAGE_ID = 1;
@@ -20,18 +18,19 @@ public class TestMultilingualSharedTm extends TM3Tests {
     @BeforeClass
     public static void setup() throws Exception {
         init();
-        Connection conn = HibernateUtil.getSession().connection();
+        currentSession = sessionFactory.openSession();
+        Connection conn = currentSession.connection();
         // Tear down storage pool from old test
         manager.removeStoragePool(conn, SHARED_STORAGE_ID);
         // Recreate it
         manager.createStoragePool(conn, SHARED_STORAGE_ID, inlineAttrs());
-        
+        currentSession.close();
     }
     
     // Set up a bilingual TM for each test, start a fresh hibernate session, etc
     @Before
     public void beforeTest() throws Exception {
-        currentSession = HibernateUtil.getSession();
+        currentSession = sessionFactory.openSession();
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();

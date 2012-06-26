@@ -16,18 +16,15 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.HashSet;
 
 import org.hibernate.Session;
+import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
 import org.hibernate.cfg.Configuration;
-import org.hibernate.criterion.Restrictions;
-import org.junit.BeforeClass;
 import org.junit.Test;
-
-import com.globalsight.persistence.hibernate.HibernateUtil;
-import com.globalsight.util.GlobalSightLocale;
 
 /**
  * Base class for storage testing.
@@ -40,25 +37,22 @@ public abstract class TM3Tests {
     static TM3Manager manager;
        
     static TestDataFactory FACTORY = new TestDataFactory();
-
-
+    static SessionFactory sessionFactory;
+    
     // Initialization method.  This should be called as part of a 
     // @BeforeClass method by all implementations!
     public static void init() throws SQLException {
-        System.out.println("TM3Tests.init");
+        sessionFactory = setupHibernate();
         cleanAllDbs();
         
-        Session session = HibernateUtil.getSession();
-
-        EN_US = FACTORY.getLocaleByCode(session, "en_US"); 
-        FR_FR = FACTORY.getLocaleByCode(session, "fr_FR");
-        DE_DE = FACTORY.getLocaleByCode(session, "de_de");
-        session.close();
+        EN_US = new TestLocale(1, "en", "US");
+        FR_FR = new TestLocale(2, "fr", "FR");
+        DE_DE = new TestLocale(3, "de", "DE");
         
         manager = DefaultManager.create();
     }
     
-    static GlobalSightLocale EN_US, FR_FR, DE_DE;
+    static TestLocale EN_US, FR_FR, DE_DE;
     
     static Set<TM3Attribute> inlineAttrs() {
         Set<TM3Attribute> r = new HashSet<TM3Attribute>();
@@ -81,14 +75,14 @@ public abstract class TM3Tests {
 
     @SuppressWarnings("unchecked")
     public static void cleanAllDbs() throws SQLException {
-        Session session = HibernateUtil.getSession();
+        Session session = sessionFactory.openSession();
         TM3Manager manager = DefaultManager.create();
         Transaction tx = null;
         try {
             tx = session.beginTransaction();
             
-            List<BaseTm> tms = session.createCriteria(BaseTm.class).list();
-            for (BaseTm tm : tms) {
+            List<BaseTm<?>> tms = session.createCriteria(BaseTm.class).list();
+            for (BaseTm<?> tm : tms) {
                 System.out.println("Cleaning up TM " + tm.getId());
                 tm.setSession(session);
                 manager.removeTm(session, tm);
@@ -128,7 +122,7 @@ public abstract class TM3Tests {
         @Override
         public Iterable<Long> tokenize() {
             String[] words = data.split(" ");
-            ArrayList fingerprints = new ArrayList(words.length);
+            ArrayList<Long> fingerprints = new ArrayList<Long>(words.length);
             for (String word: words) {
                 fingerprints.add(Fingerprint.fromString(word));
             }
@@ -145,6 +139,34 @@ public abstract class TM3Tests {
         }
     }
 
+  
+    static class TestLocale implements TM3Locale {
+        private long id;
+        private String language;
+        private String locale;
+        
+        TestLocale(long id, String language, String locale) {
+            this.id = id;
+            this.language = language;
+            this.locale = locale;
+        }
+        
+        @Override
+        public long getId() {
+            return id;
+        }
+
+        @Override
+        public String getLocaleCode() {
+            return locale;
+        }
+
+        @Override
+        public String getLanguage() {
+            return language;
+        }
+    }
+    
     static class TestDataFactory implements TM3DataFactory<TestData> {
         private TM3FuzzyMatchScorer<TestData> scorer = new TestScorer();
         
@@ -163,21 +185,35 @@ public abstract class TM3Tests {
         }
 
         @Override
-        public GlobalSightLocale getLocaleById(Session session, long id) {
-            return (GlobalSightLocale) session.get(GlobalSightLocale.class, id);
+        public TestLocale getLocaleById(Session session, long id) {
+            switch ((int)id) {
+            case 1:
+                return EN_US;
+            case 2:
+                return FR_FR;
+            case 3:
+                return DE_DE;
+            default:
+                throw new RuntimeException("Unknown locale id " + id);
+            }
         }
         
         @Override
-        public GlobalSightLocale getLocaleByCode(Session session, String code) {
+        public TestLocale getLocaleByCode(Session session, String code) {
             String[] parts = code.split("_");
             if (parts.length != 2) {
                 return null;
             }
-            return (GlobalSightLocale)session
-                .createCriteria(GlobalSightLocale.class)
-                .add(Restrictions.eq("language", parts[0]))
-                .add(Restrictions.eq("country", parts[1]))
-                .uniqueResult();
+            if (parts[0].equals("en") && parts[1].equals("US")) {
+                return EN_US;
+            }
+            else if (parts[0].equals("fr") && parts[1].equals("FR")) {
+                return FR_FR;
+            }
+            else if (parts[0].equals("de") && parts[1].equals("DE")) {
+                return DE_DE;
+            }
+            throw new RuntimeException("Unkown locale " + code);
         }
 
         @Override
@@ -597,8 +633,8 @@ public abstract class TM3Tests {
         }
     }
     
-    public void testExactMatch(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, 
-            final GlobalSightLocale tgtLocale) throws Exception {
+    public void testExactMatch(TM3Tm<TestData> tm, TestLocale srcLocale, 
+            final TestLocale tgtLocale) throws Exception {
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
@@ -638,8 +674,8 @@ public abstract class TM3Tests {
     }
     
     // Ensure the TUVs can handle unicode (ie, we are creating storage correctly)
-    public void testUnicodeContent(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, 
-            final GlobalSightLocale tgtLocale) throws Exception {
+    public void testUnicodeContent(TM3Tm<TestData> tm, TestLocale srcLocale, 
+            final TestLocale tgtLocale) throws Exception {
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
@@ -662,8 +698,8 @@ public abstract class TM3Tests {
         }
     }
     
-    public void testExactMatchingWithAttrs(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, 
-            final GlobalSightLocale tgtLocale) throws Exception {
+    public void testExactMatchingWithAttrs(TM3Tm<TestData> tm, TestLocale srcLocale, 
+            final TestLocale tgtLocale) throws Exception {
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
@@ -712,7 +748,7 @@ public abstract class TM3Tests {
     }
     
     public void testExactMachingWithNonIdentityAttributes(TM3Tm<TestData> tm, 
-            GlobalSightLocale srcLocale, final GlobalSightLocale tgtLocale) throws Exception {
+            TestLocale srcLocale, final TestLocale tgtLocale) throws Exception {
 
         Transaction tx = null;
         try {
@@ -760,8 +796,8 @@ public abstract class TM3Tests {
         }
     }
     
-    public void testExactMatchingWithInlineAttrs(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, 
-            final GlobalSightLocale tgtLocale) throws Exception {
+    public void testExactMatchingWithInlineAttrs(TM3Tm<TestData> tm, TestLocale srcLocale, 
+            final TestLocale tgtLocale) throws Exception {
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
@@ -821,8 +857,8 @@ public abstract class TM3Tests {
         }
     }
     
-    public void testExactMatchingWithNoResults(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, 
-            final GlobalSightLocale tgtLocale) throws Exception {
+    public void testExactMatchingWithNoResults(TM3Tm<TestData> tm, TestLocale srcLocale, 
+            final TestLocale tgtLocale) throws Exception {
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
@@ -845,8 +881,8 @@ public abstract class TM3Tests {
         }
     }
     
-    public void testExactMatchWithTargetLocales(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, 
-            final GlobalSightLocale tgtLocale, final GlobalSightLocale altLocale) throws Exception {
+    public void testExactMatchWithTargetLocales(TM3Tm<TestData> tm, TestLocale srcLocale, 
+            final TestLocale tgtLocale, final TestLocale altLocale) throws Exception {
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
@@ -865,7 +901,7 @@ public abstract class TM3Tests {
             expectResults(results, expected(srcData1, true));
 
             // exact match with the correct target locale plus another
-            Set<GlobalSightLocale> tgtPlusAltLocales = new HashSet<GlobalSightLocale>();
+            Set<TestLocale> tgtPlusAltLocales = new HashSet<TestLocale>();
             Collections.addAll(tgtPlusAltLocales, tgtLocale, altLocale);
             results = 
                 tm.findMatches(srcData1, srcLocale, tgtPlusAltLocales, null, TM3MatchType.EXACT, false);
@@ -882,7 +918,7 @@ public abstract class TM3Tests {
             expectResults(results, expected(tgtData1, true));
 
             // exact target match with the correct source locale plus another
-            Set<GlobalSightLocale> srcPlusAltLocales = new HashSet<GlobalSightLocale>();
+            Set<TestLocale> srcPlusAltLocales = new HashSet<TestLocale>();
             Collections.addAll(srcPlusAltLocales, srcLocale, altLocale);
             results = 
                 tm.findMatches(tgtData1, tgtLocale, srcPlusAltLocales, null, TM3MatchType.EXACT, true);
@@ -903,8 +939,8 @@ public abstract class TM3Tests {
         }
     }
     
-    public void testFuzzyMatching(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, 
-            final GlobalSightLocale tgtLocale) throws Exception {
+    public void testFuzzyMatching(TM3Tm<TestData> tm, TestLocale srcLocale, 
+            final TestLocale tgtLocale) throws Exception {
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
@@ -950,8 +986,8 @@ public abstract class TM3Tests {
 
     }
     
-    public void testFuzzyTargetMatching(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, 
-            final GlobalSightLocale tgtLocale) throws Exception {
+    public void testFuzzyTargetMatching(TM3Tm<TestData> tm, TestLocale srcLocale, 
+            final TestLocale tgtLocale) throws Exception {
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
@@ -1011,8 +1047,8 @@ public abstract class TM3Tests {
 
     }
     
-    public void testFuzzyMatchingWithAttributes(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, 
-            final GlobalSightLocale tgtLocale) throws Exception {
+    public void testFuzzyMatchingWithAttributes(TM3Tm<TestData> tm, TestLocale srcLocale, 
+            final TestLocale tgtLocale) throws Exception {
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
@@ -1064,8 +1100,8 @@ public abstract class TM3Tests {
         }
     }
     
-    public void testFuzzyMatchingWithInlineAttributes(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, 
-            final GlobalSightLocale tgtLocale) throws Exception {
+    public void testFuzzyMatchingWithInlineAttributes(TM3Tm<TestData> tm, TestLocale srcLocale, 
+            final TestLocale tgtLocale) throws Exception {
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
@@ -1132,8 +1168,8 @@ public abstract class TM3Tests {
         }
     }
     
-    public void testFuzzyMatchingWithNoResults(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, 
-            final GlobalSightLocale tgtLocale) throws Exception {
+    public void testFuzzyMatchingWithNoResults(TM3Tm<TestData> tm, TestLocale srcLocale, 
+            final TestLocale tgtLocale) throws Exception {
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
@@ -1156,8 +1192,8 @@ public abstract class TM3Tests {
         }
     }
     
-    public void testFuzzyMatchingWithTargetLocales(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, 
-            final GlobalSightLocale tgtLocale, final GlobalSightLocale altLocale) throws Exception {
+    public void testFuzzyMatchingWithTargetLocales(TM3Tm<TestData> tm, TestLocale srcLocale, 
+            final TestLocale tgtLocale, final TestLocale altLocale) throws Exception {
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
@@ -1180,7 +1216,7 @@ public abstract class TM3Tests {
             expectResults(results, expected(srcData1, false));
 
             // fuzzy query with the correct target locale plus another
-            Set<GlobalSightLocale> tgtPlusAltLocales = new HashSet<GlobalSightLocale>();
+            Set<TestLocale> tgtPlusAltLocales = new HashSet<TestLocale>();
             Collections.addAll(tgtPlusAltLocales, tgtLocale, altLocale);
             results = tm.findMatches(key, 
                     srcLocale, tgtPlusAltLocales, TM3Attributes.NONE, TM3MatchType.ALL, false);
@@ -1199,7 +1235,7 @@ public abstract class TM3Tests {
             expectResults(results, expected(tgtData1, false));
 
             // fuzzy target query with the correct source locale plus another
-            Set<GlobalSightLocale> srcPlusAltLocales = new HashSet<GlobalSightLocale>();
+            Set<TestLocale> srcPlusAltLocales = new HashSet<TestLocale>();
             Collections.addAll(srcPlusAltLocales, srcLocale, altLocale);
             results = tm.findMatches(key, 
                     tgtLocale, tgtPlusAltLocales, TM3Attributes.NONE, TM3MatchType.ALL, true);
@@ -1225,8 +1261,8 @@ public abstract class TM3Tests {
     }
     
     // Make sure the different values for TM3MatchType do what they're supposed to.
-    public void testMatchType(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, 
-            final GlobalSightLocale tgtLocale) throws Exception {
+    public void testMatchType(TM3Tm<TestData> tm, TestLocale srcLocale, 
+            final TestLocale tgtLocale) throws Exception {
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
@@ -1289,8 +1325,8 @@ public abstract class TM3Tests {
 
     }
     
-    public void testTuIdentityWithAttributes(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, 
-            final GlobalSightLocale tgtLocale) throws Exception {
+    public void testTuIdentityWithAttributes(TM3Tm<TestData> tm, TestLocale srcLocale, 
+            final TestLocale tgtLocale) throws Exception {
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
@@ -1357,8 +1393,8 @@ public abstract class TM3Tests {
         }
     }
     
-    public void testModifyTuv(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, 
-            final GlobalSightLocale tgtLocale) throws Exception {
+    public void testModifyTuv(TM3Tm<TestData> tm, TestLocale srcLocale, 
+            final TestLocale tgtLocale) throws Exception {
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
@@ -1425,8 +1461,8 @@ public abstract class TM3Tests {
         }
     }
     
-    public void testAddDeleteTuv(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, 
-            final GlobalSightLocale tgtLocale) throws Exception {
+    public void testAddDeleteTuv(TM3Tm<TestData> tm, TestLocale srcLocale, 
+            final TestLocale tgtLocale) throws Exception {
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
@@ -1493,8 +1529,8 @@ public abstract class TM3Tests {
         }
     }
     
-    public void testUpdateTuAttrs(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, 
-            final GlobalSightLocale tgtLocale) throws Exception {
+    public void testUpdateTuAttrs(TM3Tm<TestData> tm, TestLocale srcLocale, 
+            final TestLocale tgtLocale) throws Exception {
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
@@ -1552,8 +1588,8 @@ public abstract class TM3Tests {
         }
     }
     
-    public void testUpdateSourceTuv(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, 
-            final GlobalSightLocale tgtLocale) throws Exception {
+    public void testUpdateSourceTuv(TM3Tm<TestData> tm, TestLocale srcLocale, 
+            final TestLocale tgtLocale) throws Exception {
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
@@ -1624,8 +1660,8 @@ public abstract class TM3Tests {
         }
     }
     
-    public void testDontReturnRedundantResults(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, 
-            final GlobalSightLocale tgtLocale) throws Exception {
+    public void testDontReturnRedundantResults(TM3Tm<TestData> tm, TestLocale srcLocale, 
+            final TestLocale tgtLocale) throws Exception {
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
@@ -1653,8 +1689,8 @@ public abstract class TM3Tests {
     
     // Make sure that we don't store identical target TUVs for a single TU
     @SuppressWarnings("serial")
-    public void testIdempotentMergeMode(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, 
-                              final GlobalSightLocale tgtLocale) throws Exception {
+    public void testIdempotentMergeMode(TM3Tm<TestData> tm, TestLocale srcLocale, 
+                              final TestLocale tgtLocale) throws Exception {
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
@@ -1715,8 +1751,8 @@ public abstract class TM3Tests {
         }
     }
     
-    public void testTuvEvents(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, 
-                              GlobalSightLocale tgtLocale) throws Exception {
+    public void testTuvEvents(TM3Tm<TestData> tm, TestLocale srcLocale, 
+                              TestLocale tgtLocale) throws Exception {
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
@@ -1779,8 +1815,8 @@ public abstract class TM3Tests {
     }
     
     @SuppressWarnings("serial")
-    public void testFuzzyMatchThresholdAndLimit(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, 
-                              GlobalSightLocale tgtLocale) throws Exception {
+    public void testFuzzyMatchThresholdAndLimit(TM3Tm<TestData> tm, TestLocale srcLocale, 
+                              TestLocale tgtLocale) throws Exception {
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
@@ -1822,8 +1858,8 @@ public abstract class TM3Tests {
         }
     }
     
-    public void testEmptyFuzzyQuery(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, 
-                            GlobalSightLocale tgtLocale) throws Exception {
+    public void testEmptyFuzzyQuery(TM3Tm<TestData> tm, TestLocale srcLocale, 
+                            TestLocale tgtLocale) throws Exception {
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
@@ -1848,8 +1884,8 @@ public abstract class TM3Tests {
         }
     }
     
-    public void testIdenticalScores(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, 
-            GlobalSightLocale tgtLocale) throws Exception {
+    public void testIdenticalScores(TM3Tm<TestData> tm, TestLocale srcLocale, 
+            TestLocale tgtLocale) throws Exception {
         TM3FuzzyMatchScorer<TestData> oldScorer = FACTORY.getFuzzyMatchScorer();
         Transaction tx = null;
         try {
@@ -1892,8 +1928,8 @@ public abstract class TM3Tests {
         }
     }
     
-    public void testMaxResultsFilterOrdering(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, 
-            GlobalSightLocale tgtLocale) throws Exception {
+    public void testMaxResultsFilterOrdering(TM3Tm<TestData> tm, TestLocale srcLocale, 
+            TestLocale tgtLocale) throws Exception {
         TM3FuzzyMatchScorer<TestData> oldScorer = FACTORY.getFuzzyMatchScorer();
         Transaction tx = null;
         try {
@@ -1941,7 +1977,7 @@ public abstract class TM3Tests {
         }
     }
 
-    public void testGetAllTuData(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, GlobalSightLocale tgtLocale) 
+    public void testGetAllTuData(TM3Tm<TestData> tm, TestLocale srcLocale, TestLocale tgtLocale) 
                         throws Exception {
         Transaction tx = null;
         try {
@@ -1974,7 +2010,7 @@ public abstract class TM3Tests {
         }
     }
 
-    public void testGetAllTuDataWithDateRange(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, GlobalSightLocale tgtLocale) 
+    public void testGetAllTuDataWithDateRange(TM3Tm<TestData> tm, TestLocale srcLocale, TestLocale tgtLocale) 
             throws Exception {
         Transaction tx = null;
         try {
@@ -2038,7 +2074,7 @@ public abstract class TM3Tests {
         }
     }
 
-    public void testGetTuDataByLocale(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, GlobalSightLocale tgtLocale) 
+    public void testGetTuDataByLocale(TM3Tm<TestData> tm, TestLocale srcLocale, TestLocale tgtLocale) 
                 throws Exception {
         Transaction tx = null;
         try {
@@ -2069,7 +2105,7 @@ public abstract class TM3Tests {
         }
     }
     
-    public void testGetTuDataByLocaleWithDateRange(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, GlobalSightLocale tgtLocale) 
+    public void testGetTuDataByLocaleWithDateRange(TM3Tm<TestData> tm, TestLocale srcLocale, TestLocale tgtLocale) 
             throws Exception {
         Transaction tx = null;
         try {
@@ -2125,7 +2161,7 @@ public abstract class TM3Tests {
         }
     }
 
-    public void testGetTuDataById(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, GlobalSightLocale tgtLocale) 
+    public void testGetTuDataById(TM3Tm<TestData> tm, TestLocale srcLocale, TestLocale tgtLocale) 
                         throws Exception {
         Transaction tx = null;
         try {
@@ -2179,7 +2215,7 @@ public abstract class TM3Tests {
 
     // Engineer a 2-thread race to insert the same source TUV with separate target TUVs.
     // Ensure that this only produes a single TU.
-    public void testLockOnSave(final TM3Tm<TestData> testTm, final GlobalSightLocale srcLocale, final GlobalSightLocale tgtLocale)
+    public void testLockOnSave(final TM3Tm<TestData> testTm, final TestLocale srcLocale, final TestLocale tgtLocale)
                 throws Exception {
 
         final TM3Event event = testTm.addEvent(1, "test", null);
@@ -2233,7 +2269,7 @@ public abstract class TM3Tests {
     
     // Create a TU with a single translation.  Then race to add a second translation while 
     // also changing the original translation to have the save content as the proposed second one.
-    public void testLockOnModify(final TM3Tm<TestData> testTm, final GlobalSightLocale srcLocale, final GlobalSightLocale tgtLocale)
+    public void testLockOnModify(final TM3Tm<TestData> testTm, final TestLocale srcLocale, final TestLocale tgtLocale)
             throws Exception {
         
         final TM3Event event = testTm.addEvent(1, "test", null);
@@ -2324,7 +2360,7 @@ public abstract class TM3Tests {
         }
         @Override
         public void run() {
-            Session session = HibernateUtil.getSession();
+            Session session = sessionFactory.openSession();
             Transaction tx = null;
             try {
                 tx = session.beginTransaction();
@@ -2356,8 +2392,8 @@ public abstract class TM3Tests {
         return l;
     }
 
-    public void testMultipleTargets(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, 
-            final GlobalSightLocale tgtLocale) throws Exception {
+    public void testMultipleTargets(TM3Tm<TestData> tm, TestLocale srcLocale, 
+            final TestLocale tgtLocale) throws Exception {
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
@@ -2395,8 +2431,8 @@ public abstract class TM3Tests {
         }
     }
 
-    public void testIdenticalTargets(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, 
-            final GlobalSightLocale tgtLocale) throws Exception {
+    public void testIdenticalTargets(TM3Tm<TestData> tm, TestLocale srcLocale, 
+            final TestLocale tgtLocale) throws Exception {
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
@@ -2429,8 +2465,8 @@ public abstract class TM3Tests {
         }
     }
 
-    public void testMerge(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, 
-            final GlobalSightLocale tgtLocale) throws Exception {
+    public void testMerge(TM3Tm<TestData> tm, TestLocale srcLocale, 
+            final TestLocale tgtLocale) throws Exception {
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
@@ -2474,8 +2510,8 @@ public abstract class TM3Tests {
         }
     }
 
-    public void testMergeIdentical(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, 
-            final GlobalSightLocale tgtLocale) throws Exception {
+    public void testMergeIdentical(TM3Tm<TestData> tm, TestLocale srcLocale, 
+            final TestLocale tgtLocale) throws Exception {
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
@@ -2514,8 +2550,8 @@ public abstract class TM3Tests {
         }
     }
 
-    public void testMergeWithIdenticalTargets(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, 
-            final GlobalSightLocale tgtLocale) throws Exception {
+    public void testMergeWithIdenticalTargets(TM3Tm<TestData> tm, TestLocale srcLocale, 
+            final TestLocale tgtLocale) throws Exception {
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
@@ -2560,8 +2596,8 @@ public abstract class TM3Tests {
         }
     }
 
-    public void testOverwrite(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, 
-            final GlobalSightLocale tgtLocale) throws Exception {
+    public void testOverwrite(TM3Tm<TestData> tm, TestLocale srcLocale, 
+            final TestLocale tgtLocale) throws Exception {
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
@@ -2603,8 +2639,8 @@ public abstract class TM3Tests {
 
     // not all old targets were being removed due to a bug in
     // TM3Tu.removeTargetTuvByLocale
-    public void testOverwriteOfMultipleTargets(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, 
-            final GlobalSightLocale tgtLocale) throws Exception {
+    public void testOverwriteOfMultipleTargets(TM3Tm<TestData> tm, TestLocale srcLocale, 
+            final TestLocale tgtLocale) throws Exception {
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
@@ -2648,8 +2684,8 @@ public abstract class TM3Tests {
 
     // not all old targets were being removed due to a bug in
     // TM3Tu.removeTargetTuvByLocale
-    public void testOverwriteOfMultipleTargetsWithIdentical(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, 
-            final GlobalSightLocale tgtLocale) throws Exception {
+    public void testOverwriteOfMultipleTargetsWithIdentical(TM3Tm<TestData> tm, TestLocale srcLocale, 
+            final TestLocale tgtLocale) throws Exception {
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
@@ -2697,8 +2733,8 @@ public abstract class TM3Tests {
 
     // this used to fail because with every new target, we removed all existing
     // targets in that locale, even if they were also new
-    public void testOverwriteWithMultipleTargets(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, 
-            final GlobalSightLocale tgtLocale) throws Exception {
+    public void testOverwriteWithMultipleTargets(TM3Tm<TestData> tm, TestLocale srcLocale, 
+            final TestLocale tgtLocale) throws Exception {
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
@@ -2746,8 +2782,8 @@ public abstract class TM3Tests {
 
     // This used to crash because we didn't check for null when adding the
     // second identical target, so tried to save a null tuv
-    public void testOverwriteWithIdenticalTargets(TM3Tm<TestData> tm, GlobalSightLocale srcLocale, 
-            final GlobalSightLocale tgtLocale) throws Exception {
+    public void testOverwriteWithIdenticalTargets(TM3Tm<TestData> tm, TestLocale srcLocale, 
+            final TestLocale tgtLocale) throws Exception {
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
@@ -2791,8 +2827,8 @@ public abstract class TM3Tests {
     // In GlobalSight, it's possible to have logically identical TUVs with content
     // that is not string-identical (because of optional inline XML attributes).  
     // We simulate with a test here.
-    public void testFixedFingerprintTuvs(GlobalSightLocale srcLocale, 
-            final GlobalSightLocale tgtLocale) throws Exception {
+    public void testFixedFingerprintTuvs(TestLocale srcLocale, 
+            final TestLocale tgtLocale) throws Exception {
         FixedValueTestDataFactory factory = new FixedValueTestDataFactory(2L);
         TM3Tm<TestData> tm = manager.getTm(currentSession, factory, currentTestId);
         Transaction tx = null;
@@ -2842,8 +2878,8 @@ public abstract class TM3Tests {
      * when using getDataByLocale().  (GBS-2328).
      */
      public void testDataByLocaleOrdering(TM3Tm<TestData> tm, 
-            GlobalSightLocale srcLocale, GlobalSightLocale tgtLocale1, 
-            GlobalSightLocale tgtLocale2) throws Exception {
+            TestLocale srcLocale, TestLocale tgtLocale1, 
+            TestLocale tgtLocale2) throws Exception {
 
         Transaction tx = null;
         try {
@@ -2936,5 +2972,29 @@ public abstract class TM3Tests {
             throw new RuntimeException("unexpected multiple target tuvs");
         }
     }
+    
+    public static SessionFactory setupHibernate() {
+        long start = System.currentTimeMillis();
+        Properties props = new Properties();
+        // TODO: use build properties
+        props.put("hibernate.dialect", "org.hibernate.dialect.MySQLInnoDBDialect");
+        props.put("hibernate.connection.driver_class", "com.mysql.jdbc.Driver");
+        props.put("hibernate.connection.url", 
+                  "jdbc:mysql://localhost:3306/globalsight_8900?useUnicode=true&characterEncoding=UTF-8");
+        props.put("hibernate.connection.username", "dev");
+        props.put("hibernate.connection.password", "globalsight");
+        props.put("hibernate.cglib.use_reflection_optimizer", "false"); // this is default in hibernate 3.2
+        props.put("hibernate.show_sql", "false");
+        props.put("hibernate.format_sql", "true");
+        // For debug
+        props.put("hibernate.connection.pool_size", "1");
+        Configuration cfg = new Configuration().addProperties(props);
+        cfg = new TestDataFactory().extendConfiguration(cfg);
+        SessionFactory sessionFactory = cfg.buildSessionFactory();
+        System.out.println("Hibernate initialization took " + 
+                           (System.currentTimeMillis() - start) + "ms");
+        return sessionFactory;
+    }
+
 
 }
