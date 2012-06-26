@@ -579,7 +579,7 @@ class DedicatedTuStorage<T extends TM3Data>  extends TuStorage<T> {
         else {
             sb.append("SELECT DISTINCT tuId FROM ")
               .append(getStorage().getTuvTableName())
-              .append(" WHERE localeId = ? AND tuId > ? ORDER BY id ASC LIMIT ?")
+              .append(" WHERE localeId = ? AND tuId > ? ORDER BY tuId ASC LIMIT ?")
               .addValues(locale.getId(), startId, count);
         }
         return getTu(SQLUtil.execIdsQuery(getConnection(), sb), false);
