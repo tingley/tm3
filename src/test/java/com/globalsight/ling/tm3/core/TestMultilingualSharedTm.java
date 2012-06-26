@@ -48,12 +48,9 @@ public class TestMultilingualSharedTm extends TM3Tests {
         }
     }
     
-    // This leaves the tm in the db for later inspection
     @After
     public void afterTest() throws Exception {
-        if (currentSession.isOpen()) {
-            currentSession.close();
-        }
+        super.afterTest();
     }
     
     @Test

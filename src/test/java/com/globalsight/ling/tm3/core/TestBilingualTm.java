@@ -40,15 +40,12 @@ public class TestBilingualTm extends TM3Tests {
             throw e;
         }
     }
-    
-    // This leaves the tm in the db for later inspection
+  
     @After
     public void afterTest() throws Exception {
-        if (currentSession.isOpen()) {
-            currentSession.close();
-        }
+        super.afterTest();
     }
-    
+        
     @Test
     public void testCreateBilingualTm() throws Exception {
         Transaction tx = null;

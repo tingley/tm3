@@ -25,6 +25,7 @@ import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
 import org.hibernate.cfg.Configuration;
+import org.junit.After;
 import org.junit.Test;
 
 import com.globalsight.ling.tm3.core.persistence.HibernateConfig;
@@ -37,6 +38,7 @@ public abstract class TM3Tests {
     static long currentTestId = 0;
     static TM3Event currentTestEvent = null;
     static Session currentSession;
+    static Transaction currentTransaction;
     static TM3Manager manager;
        
     static TestDataFactory FACTORY = new TestDataFactory();
@@ -53,6 +55,21 @@ public abstract class TM3Tests {
         DE_DE = new TestLocale(3, "de", "DE");
         
         manager = DefaultManager.create();
+    }
+    
+    // This leaves the tm in the db for later inspection.
+    // All subclasses should call this in an @After method!
+    public void afterTest() throws Exception {
+        // If tests failed, transaction may still be active.  If we don't
+        // roll it back then DB cleanup will hang in MySQL 5.5 due to 
+        // metadata locking until the transaction expiration timer fires.
+        if (currentTransaction != null && currentTransaction.isActive()) {
+            System.out.println("Cleaning up transaction");
+            currentTransaction.rollback();
+        }
+        if (currentSession != null && currentSession.isOpen()) {
+            currentSession.close();
+        }
     }
     
     static TestLocale EN_US, FR_FR, DE_DE;
@@ -638,9 +655,8 @@ public abstract class TM3Tests {
     
     public void testExactMatch(TM3Tm<TestData> tm, TestLocale srcLocale, 
             final TestLocale tgtLocale) throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             // Now let's create some segments.
             TestData srcData1 = new TestData("This is source 1");
             TestData srcData2 = new TestData("This is source 2");
@@ -650,10 +666,10 @@ public abstract class TM3Tests {
                     tgtLocale, tgtData1, TM3SaveMode.MERGE, currentTestEvent);
             tm.save(srcLocale, srcData2, null, 
                     tgtLocale, tgtData2, TM3SaveMode.MERGE, currentTestEvent);
-            tx.commit();
+            currentTransaction.commit();
             
             // Now let's do an exact match query
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             verifyExact(tm, srcData1, srcLocale, tgtData1, tgtLocale, false);
             verifyExact(tm, srcData2, srcLocale, tgtData2, tgtLocale, false);
 
@@ -666,12 +682,12 @@ public abstract class TM3Tests {
                 tm.findMatches(tgtData1, tgtLocale, null,  TM3Attributes.NONE, TM3MatchType.ALL, false);
             expectResults(results);
             
-            tx.commit();
+            currentTransaction.commit();
 
             cleanupTestDb(manager);
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
     }
@@ -679,33 +695,31 @@ public abstract class TM3Tests {
     // Ensure the TUVs can handle unicode (ie, we are creating storage correctly)
     public void testUnicodeContent(TM3Tm<TestData> tm, TestLocale srcLocale, 
             final TestLocale tgtLocale) throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             // Now let's create some segments.
             TestData srcData1 = new TestData("This is source 1");
             TestData tgtData1 = new TestData("\u306b\u307b\u3093"); // Hiragana "Nihon"
             tm.save(srcLocale, srcData1, null, 
                     tgtLocale, tgtData1, TM3SaveMode.MERGE, currentTestEvent);
-            tx.commit();
+            currentTransaction.commit();
             
             // Now let's do an exact match query
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             verifyExact(tm, srcData1, srcLocale, tgtData1, tgtLocale, false);
 
             cleanupTestDb(manager);
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
     }
     
     public void testExactMatchingWithAttrs(TM3Tm<TestData> tm, TestLocale srcLocale, 
             final TestLocale tgtLocale) throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             tm.addAttribute("test");
             currentSession.flush();
 
@@ -720,10 +734,10 @@ public abstract class TM3Tests {
                     tgtLocale, tgtData1, TM3SaveMode.MERGE, currentTestEvent);
             tm.save(srcLocale, srcData1, TM3Attributes.one(attr1, "good"), 
                     tgtLocale, tgtData2, TM3SaveMode.MERGE, currentTestEvent);
-            tx.commit();
+            currentTransaction.commit();
             
             // Now let's do an exact match query
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             TestData key = new TestData("This is source 1");
 
             // First, search without attributes -- this should catch both
@@ -740,12 +754,12 @@ public abstract class TM3Tests {
             assertEquals(key, match.getTuv().getContent());
             assertEquals(new TestData("This is target 2"),
                          getLocaleTuv(match.getTu(), FR_FR).getContent());
-            tx.commit();
+            currentTransaction.commit();
 
             cleanupTestDb(manager);          
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
     }
@@ -753,9 +767,8 @@ public abstract class TM3Tests {
     public void testExactMachingWithNonIdentityAttributes(TM3Tm<TestData> tm, 
             TestLocale srcLocale, final TestLocale tgtLocale) throws Exception {
 
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
 
             final TM3Attribute attr1 = tm.getAttributeByName("inlineString");
             final TM3Attribute attr2 = tm.getAttributeByName("optionalString");
@@ -776,9 +789,9 @@ public abstract class TM3Tests {
                     TM3Attributes.entry(attr1, "required"),
                     TM3Attributes.entry(attr2, "optional2")),
                 tgtLocale, tgtData2, TM3SaveMode.MERGE, currentTestEvent);
-            tx.commit();
+            currentTransaction.commit();
             
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
 
             TM3LeverageResults<TestData> results = 
                 tm.findMatches(srcData1, srcLocale, null, 
@@ -794,16 +807,15 @@ public abstract class TM3Tests {
             assertEquals(tgtLocale, targets.get(1).getLocale());
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
     }
     
     public void testExactMatchingWithInlineAttrs(TM3Tm<TestData> tm, TestLocale srcLocale, 
             final TestLocale tgtLocale) throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             tm.addAttribute("test");
             currentSession.flush();
 
@@ -826,10 +838,10 @@ public abstract class TM3Tests {
                         TM3Attributes.entry(attr2, "GOOD"),
                         TM3Attributes.entry(attr3, true)),
                     tgtLocale, tgtData2, TM3SaveMode.MERGE, currentTestEvent);
-            tx.commit();
+            currentTransaction.commit();
             
             // Now let's do an exact match query
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             TestData key = new TestData("This is source 1");
 
             // First, search without attributes -- this should catch both
@@ -850,21 +862,20 @@ public abstract class TM3Tests {
             assertEquals(key, match.getTuv().getContent());
             assertEquals(new TestData("This is target 2"),
                          getLocaleTuv(match.getTu(), FR_FR).getContent());
-            tx.commit();
+            currentTransaction.commit();
 
             cleanupTestDb(manager);          
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
     }
     
     public void testExactMatchingWithNoResults(TM3Tm<TestData> tm, TestLocale srcLocale, 
             final TestLocale tgtLocale) throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             tm.addAttribute("test");
             currentSession.flush();
 
@@ -874,29 +885,28 @@ public abstract class TM3Tests {
             TM3LeverageResults<TestData> results = tm.findMatches(new TestData("blah blah"), 
                     srcLocale, null, TM3Attributes.NONE, TM3MatchType.EXACT, false);
             assertEquals(0, results.getMatches().size());
-            tx.commit();
+            currentTransaction.commit();
 
             cleanupTestDb(manager);
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
     }
     
     public void testExactMatchWithTargetLocales(TM3Tm<TestData> tm, TestLocale srcLocale, 
             final TestLocale tgtLocale, final TestLocale altLocale) throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             // Now let's create some segments.
             TestData srcData1 = new TestData("This is source 1");
             TestData tgtData1 = new TestData("This is target 1");
             tm.save(srcLocale, srcData1, null, 
                     tgtLocale, tgtData1, TM3SaveMode.MERGE, currentTestEvent);
-            tx.commit();
+            currentTransaction.commit();
             
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
 
             // exact match with the correct target locale
             TM3LeverageResults<TestData> results = 
@@ -932,21 +942,20 @@ public abstract class TM3Tests {
                 tm.findMatches(tgtData1, tgtLocale, Collections.singleton(altLocale), null, TM3MatchType.EXACT, true);
             expectResults(results);
 
-            tx.commit();
+            currentTransaction.commit();
 
             cleanupTestDb(manager);
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
     }
     
     public void testFuzzyMatching(TM3Tm<TestData> tm, TestLocale srcLocale, 
             final TestLocale tgtLocale) throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             tm.addAttribute("test");
             currentSession.flush();
 
@@ -960,10 +969,10 @@ public abstract class TM3Tests {
             tm.save(srcLocale, srcData1, TM3Attributes.NONE, tgtLocale, tgtData1, TM3SaveMode.MERGE, currentTestEvent);
             tm.save(srcLocale, srcData2, TM3Attributes.NONE, tgtLocale, tgtData2, TM3SaveMode.MERGE, currentTestEvent);
             tm.save(srcLocale, srcData3, TM3Attributes.NONE, tgtLocale, tgtData3, TM3SaveMode.MERGE, currentTestEvent);
-            tx.commit();
+            currentTransaction.commit();
             
             // Do a fuzzy query
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             TestData key = new TestData("The quick brown fox jumped over the lazy dogs.");
 
             TM3LeverageResults<TestData> results = tm.findMatches(key, 
@@ -978,12 +987,12 @@ public abstract class TM3Tests {
             results = tm.findMatches(key, tgtLocale, null,  TM3Attributes.NONE, TM3MatchType.ALL, true);
             expectResults(results);
             
-            tx.commit();
+            currentTransaction.commit();
 
             cleanupTestDb(manager); 
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
 
@@ -991,9 +1000,8 @@ public abstract class TM3Tests {
     
     public void testFuzzyTargetMatching(TM3Tm<TestData> tm, TestLocale srcLocale, 
             final TestLocale tgtLocale) throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             tm.addAttribute("test");
             currentSession.flush();
 
@@ -1008,10 +1016,10 @@ public abstract class TM3Tests {
             tm.save(srcLocale, srcData1, TM3Attributes.NONE, tgtLocale, tgtData1, TM3SaveMode.MERGE, currentTestEvent);
             tm.save(srcLocale, srcData2, TM3Attributes.NONE, tgtLocale, tgtData2, TM3SaveMode.MERGE, currentTestEvent);
             tm.save(srcLocale, srcData3, TM3Attributes.NONE, tgtLocale, tgtData3, TM3SaveMode.MERGE, currentTestEvent);
-            tx.commit();
+            currentTransaction.commit();
             
             // Do a fuzzy query
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             TestData key = new TestData("The quick brown fox jumped over the lazy dogs.");
 
             TM3LeverageResults<TestData> results = tm.findMatches(key, 
@@ -1036,12 +1044,12 @@ public abstract class TM3Tests {
             results = tm.findMatches(key, tgtLocale, null,  TM3Attributes.NONE, TM3MatchType.ALL, false);
             expectResults(results);
 
-            tx.commit();
+            currentTransaction.commit();
 
             cleanupTestDb(manager); 
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
         finally {
@@ -1052,9 +1060,8 @@ public abstract class TM3Tests {
     
     public void testFuzzyMatchingWithAttributes(TM3Tm<TestData> tm, TestLocale srcLocale, 
             final TestLocale tgtLocale) throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             tm.addAttribute("test");
             currentSession.flush();
 
@@ -1074,11 +1081,11 @@ public abstract class TM3Tests {
                     tgtLocale, tgtData2, TM3SaveMode.MERGE, currentTestEvent);
             tm.save(srcLocale, srcData3, TM3Attributes.one(attr1, "no"), 
                     tgtLocale, tgtData3, TM3SaveMode.MERGE, currentTestEvent);
-            tx.commit();
+            currentTransaction.commit();
             
             // Do a fuzzy query matching on the attribute value 'yes'.  This should match
             // src1 (attr + fuzzy), but not src2 (attr, but no fuzzy) or src3 (no attr)
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             TestData key = new TestData("The quick brown fox jumped over the lazy dogs.");
 
             // First, search with attributes -- this should catch both
@@ -1093,21 +1100,20 @@ public abstract class TM3Tests {
             assertEquals(1, match.getAttributes().size());
             assertNotNull(match.getAttribute(attr1));
             assertEquals("yes", match.getAttribute(attr1));
-            tx.commit();
+            currentTransaction.commit();
 
             cleanupTestDb(manager);
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
     }
     
     public void testFuzzyMatchingWithInlineAttributes(TM3Tm<TestData> tm, TestLocale srcLocale, 
             final TestLocale tgtLocale) throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             tm.addAttribute("test");
             currentSession.flush();
 
@@ -1138,11 +1144,11 @@ public abstract class TM3Tests {
                         TM3Attributes.entry(attr2, "NO"),
                         TM3Attributes.entry(attr3, false)),
                     tgtLocale, tgtData3, TM3SaveMode.MERGE, currentTestEvent);
-            tx.commit();
+            currentTransaction.commit();
             
             // Do a fuzzy query matching on the attribute value 'yes'.  This should match
             // src1 (attr + fuzzy), but not src2 (attr, but no fuzzy) or src3 (no attr)
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             TestData key = new TestData("The quick brown fox jumped over the lazy dogs.");
 
             // First, search with attributes -- this should catch both
@@ -1161,21 +1167,20 @@ public abstract class TM3Tests {
             assertEquals(3, match.getAttributes().size());
             assertNotNull(match.getAttribute(attr1));
             assertEquals("yes", match.getAttribute(attr1));
-            tx.commit();
+            currentTransaction.commit();
 
             cleanupTestDb(manager);
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
     }
     
     public void testFuzzyMatchingWithNoResults(TM3Tm<TestData> tm, TestLocale srcLocale, 
             final TestLocale tgtLocale) throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             tm.addAttribute("test");
             currentSession.flush();
 
@@ -1185,21 +1190,20 @@ public abstract class TM3Tests {
             TM3LeverageResults<TestData> results = tm.findMatches(new TestData("blah blah"),
                     srcLocale, null,  TM3Attributes.one(attr1, "yes"), TM3MatchType.ALL, false);
             assertEquals(0, results.getMatches().size());
-            tx.commit();
+            currentTransaction.commit();
 
             cleanupTestDb(manager);
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
     }
     
     public void testFuzzyMatchingWithTargetLocales(TM3Tm<TestData> tm, TestLocale srcLocale, 
             final TestLocale tgtLocale, final TestLocale altLocale) throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             tm.addAttribute("test");
             currentSession.flush();
 
@@ -1208,9 +1212,9 @@ public abstract class TM3Tests {
             TestData tgtData1 = new TestData("This is target 1");
             tm.setIndexTarget(true);
             tm.save(srcLocale, srcData1, TM3Attributes.NONE, tgtLocale, tgtData1, TM3SaveMode.MERGE, currentTestEvent);
-            tx.commit();
+            currentTransaction.commit();
             
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             TestData key = new TestData("The quick brown fox jumped over the lazy dogs.");
 
             // fuzzy query with the correct target locale
@@ -1249,12 +1253,12 @@ public abstract class TM3Tests {
                     tgtLocale, Collections.singleton(altLocale), TM3Attributes.NONE, TM3MatchType.ALL, true);
             expectResults(results);
 
-            tx.commit();
+            currentTransaction.commit();
 
             cleanupTestDb(manager); 
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
         finally {
@@ -1266,9 +1270,8 @@ public abstract class TM3Tests {
     // Make sure the different values for TM3MatchType do what they're supposed to.
     public void testMatchType(TM3Tm<TestData> tm, TestLocale srcLocale, 
             final TestLocale tgtLocale) throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
 
             // Create some segments.
             TestData srcData1 = new TestData("I like to eat flying fish");
@@ -1280,9 +1283,9 @@ public abstract class TM3Tests {
             tm.save(srcLocale, srcData1, TM3Attributes.NONE, tgtLocale, tgtData1, TM3SaveMode.MERGE, currentTestEvent);
             tm.save(srcLocale, srcData2, TM3Attributes.NONE, tgtLocale, tgtData2, TM3SaveMode.MERGE, currentTestEvent);
             tm.save(srcLocale, srcData3, TM3Attributes.NONE, tgtLocale, tgtData3, TM3SaveMode.MERGE, currentTestEvent);
-            tx.commit();
+            currentTransaction.commit();
             
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             TM3LeverageResults<TestData> results;
             
             // Test EXACT mode
@@ -1317,12 +1320,12 @@ public abstract class TM3Tests {
                     expected(srcData2, false)
             );
             
-            tx.commit();
+            currentTransaction.commit();
 
             cleanupTestDb(manager); 
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
 
@@ -1330,9 +1333,8 @@ public abstract class TM3Tests {
     
     public void testTuIdentityWithAttributes(TM3Tm<TestData> tm, TestLocale srcLocale, 
             final TestLocale tgtLocale) throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             final TM3Attribute attr1 = tm.addAttribute("test1");
             final TM3Attribute attr2 = tm.addAttribute("inlineString");
             final TM3Attribute attr3 = tm.addAttribute("inlineBoolean");
@@ -1386,21 +1388,20 @@ public abstract class TM3Tests {
                 }
             }
                        
-            tx.commit();
+            currentTransaction.commit();
             
             cleanupTestDb(manager);
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
     }
     
     public void testModifyTuv(TM3Tm<TestData> tm, TestLocale srcLocale, 
             final TestLocale tgtLocale) throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
 
             // Now let's create some segments.
             TestData srcData1 = new TestData("This is source 1");
@@ -1408,10 +1409,10 @@ public abstract class TM3Tests {
             TestData tgtData2 = new TestData("c b a");
             tm.setIndexTarget(true);
             tm.save(srcLocale, srcData1, TM3Attributes.NONE, tgtLocale, tgtData1, TM3SaveMode.MERGE, currentTestEvent);
-            tx.commit();
+            currentTransaction.commit();
             
             // Make sure the data is all intact
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             TestData key = new TestData("This is source 1");
             TM3LeverageResults<TestData> results = 
                 tm.findMatches(key, srcLocale, null, null, TM3MatchType.EXACT, false);
@@ -1425,10 +1426,10 @@ public abstract class TM3Tests {
             // Now update one of the tuvs, but not the other
             getLocaleTuv(tu, tgtLocale).setContent(tgtData2);
             tm.modifyTu(tu, currentTestEvent);
-            tx.commit();
+            currentTransaction.commit();
             
             // Now make sure it persisted
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             results = tm.findMatches(key, srcLocale, null, null, TM3MatchType.EXACT, false);
             assertEquals(1, results.getMatches().size());
             tu = results.getMatches().first().getTu();
@@ -1452,11 +1453,11 @@ public abstract class TM3Tests {
                 tm.findMatches(key, tgtLocale, null,  TM3Attributes.NONE, TM3MatchType.ALL, true);
             expectResults(results);
             
-            tx.commit();
+            currentTransaction.commit();
             cleanupTestDb(manager);
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
         finally {
@@ -1466,9 +1467,8 @@ public abstract class TM3Tests {
     
     public void testAddDeleteTuv(TM3Tm<TestData> tm, TestLocale srcLocale, 
             final TestLocale tgtLocale) throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
 
             // Now let's create some segments.
             TestData srcData1 = new TestData("This is source 1");
@@ -1476,10 +1476,10 @@ public abstract class TM3Tests {
             TestData tgtData2 = new TestData("c b a");
             tm.setIndexTarget(true);
             tm.save(srcLocale, srcData1, TM3Attributes.NONE, tgtLocale, tgtData1, TM3SaveMode.MERGE, currentTestEvent);
-            tx.commit();
+            currentTransaction.commit();
             
             // Make sure the data is all intact
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             TestData key = new TestData("This is source 1");
             TM3LeverageResults<TestData> results = 
                 tm.findMatches(key, srcLocale, null, null, TM3MatchType.EXACT, false);
@@ -1494,10 +1494,10 @@ public abstract class TM3Tests {
             tu.removeTargetTuvs();
             tu.addTargetTuv(FR_FR, tgtData2, currentTestEvent);
             tm.modifyTu(tu, currentTestEvent);
-            tx.commit();
+            currentTransaction.commit();
             
             // Now make sure it persisted
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             results = tm.findMatches(key, srcLocale, null, null, TM3MatchType.EXACT, false);
             assertEquals(1, results.getMatches().size());
             tu = results.getMatches().first().getTu();
@@ -1524,7 +1524,7 @@ public abstract class TM3Tests {
             cleanupTestDb(manager);
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
         finally {
@@ -1534,9 +1534,8 @@ public abstract class TM3Tests {
     
     public void testUpdateTuAttrs(TM3Tm<TestData> tm, TestLocale srcLocale, 
             final TestLocale tgtLocale) throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             TM3Attribute attr1 = tm.addAttribute("attr1");
             TM3Attribute attr2 = tm.addAttribute("inlineString");
 
@@ -1546,10 +1545,10 @@ public abstract class TM3Tests {
             tm.save(srcLocale, srcData1, TM3Attributes.many(TM3Attributes.entry(attr1, "attr1_val1"),
                                          TM3Attributes.entry(attr2, "attr2_val1")), 
                     tgtLocale, tgtData1, TM3SaveMode.MERGE, currentTestEvent);
-            tx.commit();
+            currentTransaction.commit();
             
             // Make sure the data is all intact
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             TestData key = new TestData("This is source 1");
             TM3LeverageResults<TestData> results = 
                 tm.findMatches(key, srcLocale, null, null, TM3MatchType.EXACT, false);
@@ -1568,10 +1567,10 @@ public abstract class TM3Tests {
             tu.setAttribute(attr1, "attr1_val2");
             attrs.put(attr2, "attr2_val2");
             tm.modifyTu(tu, currentTestEvent);
-            tx.commit();
+            currentTransaction.commit();
             
             // Now make sure it persisted
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             results = tm.findMatches(key, srcLocale, null, null, TM3MatchType.EXACT, false);
             assertEquals(1, results.getMatches().size());
             tu = results.getMatches().first().getTu();
@@ -1581,21 +1580,20 @@ public abstract class TM3Tests {
             assertEquals(2, attrs.entrySet().size());
             assertEquals("attr1_val2", attrs.get(attr1));
             assertEquals("attr2_val2", attrs.get(attr2));
-            tx.commit();
+            currentTransaction.commit();
             
             cleanupTestDb(manager);
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
     }
     
     public void testUpdateSourceTuv(TM3Tm<TestData> tm, TestLocale srcLocale, 
             final TestLocale tgtLocale) throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
 
             // Now let's create some segments.
             TestData srcData1 = new TestData("a b c");
@@ -1603,10 +1601,10 @@ public abstract class TM3Tests {
             TestData tgtData1 = new TestData("This is target 1");
             tm.setIndexTarget(true);
             tm.save(srcLocale, srcData1, TM3Attributes.NONE, tgtLocale, tgtData1, TM3SaveMode.MERGE, currentTestEvent);
-            tx.commit();
+            currentTransaction.commit();
             
             // Make sure the data is all intact
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             TM3LeverageResults<TestData> results = 
                 tm.findMatches(srcData1, srcLocale, null, null, TM3MatchType.EXACT, false);
             assertEquals(1, results.getMatches().size());
@@ -1619,10 +1617,10 @@ public abstract class TM3Tests {
             // Update the source
             tu.getSourceTuv().setContent(srcData2);
             tm.modifyTu(tu, currentTestEvent);
-            tx.commit();
+            currentTransaction.commit();
             
             // Now make sure it persisted
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             results = tm.findMatches(srcData2, srcLocale, null, null, TM3MatchType.EXACT, false);
             assertEquals(1, results.getMatches().size());
             tu = results.getMatches().first().getTu();
@@ -1655,7 +1653,7 @@ public abstract class TM3Tests {
             cleanupTestDb(manager);
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
         finally {
@@ -1665,27 +1663,26 @@ public abstract class TM3Tests {
     
     public void testDontReturnRedundantResults(TM3Tm<TestData> tm, TestLocale srcLocale, 
             final TestLocale tgtLocale) throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             // Now let's create some segments.
             TestData srcData1 = new TestData("This is source 1");
             TestData tgtData1 = new TestData("This is target 1");
             tm.save(srcLocale, srcData1, null, tgtLocale, tgtData1, TM3SaveMode.MERGE, currentTestEvent);
-            tx.commit();
+            currentTransaction.commit();
             
             // Now let's do an exact match query
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             TM3LeverageResults<TestData> results =
                 tm.findMatches(srcData1, srcLocale, null, null, TM3MatchType.ALL, false);
             assertEquals(1, results.getMatches().size());
             expectResults(results, expected(srcData1, true));
-            tx.commit();
+            currentTransaction.commit();
 
             cleanupTestDb(manager);
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
     }
@@ -1694,20 +1691,19 @@ public abstract class TM3Tests {
     @SuppressWarnings("serial")
     public void testIdempotentMergeMode(TM3Tm<TestData> tm, TestLocale srcLocale, 
                               final TestLocale tgtLocale) throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             TestData srcData1 = new TestData("This is source 1");
             TestData tgtData1 = new TestData("This is target 1");
             tm.save(srcLocale, srcData1, TM3Attributes.NONE, tgtLocale, tgtData1, TM3SaveMode.MERGE, currentTestEvent);
-            tx.commit();
+            currentTransaction.commit();
             
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             TestData tgtData2 = new TestData("This is target 1"); // identical to tgtData1
             tm.save(srcLocale, srcData1, TM3Attributes.NONE, tgtLocale, tgtData2, TM3SaveMode.MERGE, currentTestEvent);
-            tx.commit();
+            currentTransaction.commit();
 
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             TM3LeverageResults<TestData> results = 
                 tm.findMatches(srcData1, srcLocale, null, TM3Attributes.NONE, TM3MatchType.EXACT, false);
             expectResults(results, expected(srcData1, true));
@@ -1718,24 +1714,24 @@ public abstract class TM3Tests {
             assertEquals(1, tuvs.size());
             assertEquals(tgtLocale, tuvs.get(0).getLocale());
             assertEquals(tgtData1, tuvs.get(0).getContent());
-            tx.commit();
+            currentTransaction.commit();
             
             // Now do the same thing again, but using the multi-target save signature.
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             TestData srcData2 = new TestData("This is source 2");
             final TestData target2 = new TestData("Target 2");
             tm.save(srcLocale, srcData2, TM3Attributes.NONE, tgtLocale, target2, TM3SaveMode.MERGE, currentTestEvent);
-            tx.commit();
+            currentTransaction.commit();
             
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             // This should fail
             tm.save(srcLocale, srcData2, TM3Attributes.NONE, 
                     new HashMap<TM3Locale, TestData>() {{
                        put(tgtLocale, target2); 
                     }}, TM3SaveMode.MERGE, currentTestEvent);
-            tx.commit();
+            currentTransaction.commit();
             
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             results = 
                 tm.findMatches(srcData2, srcLocale, null, TM3Attributes.NONE, TM3MatchType.EXACT, false);
             expectResults(results, expected(srcData2, true));
@@ -1746,29 +1742,28 @@ public abstract class TM3Tests {
             assertEquals(1, tuvs.size());
             assertEquals(tgtLocale, tuvs.get(0).getLocale());
             assertEquals(target2, tuvs.get(0).getContent());
-            tx.commit();
+            currentTransaction.commit();
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
     }
     
     public void testTuvEvents(TM3Tm<TestData> tm, TestLocale srcLocale, 
                               TestLocale tgtLocale) throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             final TM3Event event1 = tm.addEvent(0, "tester", "Initial creation");
             
             TestData srcData1 = new TestData("This is source 1");
             TestData tgtData1 = new TestData("This is target 1");
             TestData tgtData2 = new TestData("This is target 2");
             tm.save(srcLocale, srcData1, TM3Attributes.NONE, tgtLocale, tgtData1, TM3SaveMode.MERGE, event1);
-            tx.commit();
+            currentTransaction.commit();
             
             // Make sure the data is all intact
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             TM3Event loadedEvent = tm.getEvent(event1.getId());
             assertNotNull(loadedEvent);
             assertEquals("tester", loadedEvent.getUsername());
@@ -1794,9 +1789,9 @@ public abstract class TM3Tests {
             final TM3Event event2 = tm.addEvent(0, "tester", "TUV modification");
             getLocaleTuv(tu, tgtLocale).setContent(tgtData2);
             tm.modifyTu(tu, event2);
-            tx.commit();
+            currentTransaction.commit();
             
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             results = tm.findMatches(key, srcLocale, null, null, TM3MatchType.EXACT, false);
             assertEquals(1, results.getMatches().size());
             tu = results.getMatches().first().getTu();
@@ -1807,12 +1802,12 @@ public abstract class TM3Tests {
             assertEquals(event2, targetTuv.getLatestEvent());
             assertEquals(event1, targetTuv.getFirstEvent());
             
-            tx.commit();
+            currentTransaction.commit();
             
             cleanupTestDb(manager);
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
     }
@@ -1820,9 +1815,8 @@ public abstract class TM3Tests {
     @SuppressWarnings("serial")
     public void testFuzzyMatchThresholdAndLimit(TM3Tm<TestData> tm, TestLocale srcLocale, 
                               TestLocale tgtLocale) throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             
             TestData srcData1 = new TestData("A B E F");
             TestData tgtData1 = new TestData("This is target 1");
@@ -1830,9 +1824,9 @@ public abstract class TM3Tests {
             TestData tgtData2 = new TestData("This is target 2");
             tm.save(srcLocale, srcData1, TM3Attributes.NONE, tgtLocale, tgtData1, TM3SaveMode.MERGE, currentTestEvent);
             tm.save(srcLocale, srcData2, TM3Attributes.NONE, tgtLocale, tgtData2, TM3SaveMode.MERGE, currentTestEvent);
-            tx.commit();
+            currentTransaction.commit();
             
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             
             // Search with threshold 50 -- this should pick up both
             TM3LeverageResults<TestData> results = 
@@ -1851,38 +1845,37 @@ public abstract class TM3Tests {
             expectResults(results, expected(srcData2, false));
             
             
-            tx.commit();
+            currentTransaction.commit();
                         
             cleanupTestDb(manager);
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
     }
     
     public void testEmptyFuzzyQuery(TM3Tm<TestData> tm, TestLocale srcLocale, 
                             TestLocale tgtLocale) throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             
             TestData srcData1 = new TestData("A B C D E F");
             TestData tgtData1 = new TestData("This is target 1");
             tm.save(srcLocale, srcData1, TM3Attributes.NONE, tgtLocale, tgtData1, TM3SaveMode.MERGE, currentTestEvent);
-            tx.commit();
+            currentTransaction.commit();
             
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             
             TM3LeverageResults<TestData> results = 
                 tm.findMatches(new TestData("   "), srcLocale, null, TM3Attributes.NONE, TM3MatchType.ALL, false, 1000, 50);
             assertEquals(0, results.getMatches().size());
-            tx.commit();
+            currentTransaction.commit();
                         
             cleanupTestDb(manager);
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
     }
@@ -1890,9 +1883,8 @@ public abstract class TM3Tests {
     public void testIdenticalScores(TM3Tm<TestData> tm, TestLocale srcLocale, 
             TestLocale tgtLocale) throws Exception {
         TM3FuzzyMatchScorer<TestData> oldScorer = FACTORY.getFuzzyMatchScorer();
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             
             // Use a new scorer that only returns one result
             FACTORY.setFuzzyMatchScorer(new TM3FuzzyMatchScorer<TestData>() {                
@@ -1906,9 +1898,9 @@ public abstract class TM3Tests {
                     new TestData("This is target 1"), TM3SaveMode.MERGE, currentTestEvent);
             tm.save(srcLocale, new TestData("A B C D F"), TM3Attributes.NONE, tgtLocale, 
                     new TestData("This is target 2"), TM3SaveMode.MERGE, currentTestEvent);
-            tx.commit();
+            currentTransaction.commit();
             
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             
             // Search with threshold 50 -- this should pick up both
             TM3LeverageResults<TestData> results = 
@@ -1918,12 +1910,12 @@ public abstract class TM3Tests {
                 assertFalse(match.isExact());
                 assertEquals(78, match.getScore());
             }
-            tx.commit();
+            currentTransaction.commit();
                     
             cleanupTestDb(manager);
             }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
         finally {
@@ -1934,9 +1926,8 @@ public abstract class TM3Tests {
     public void testMaxResultsFilterOrdering(TM3Tm<TestData> tm, TestLocale srcLocale, 
             TestLocale tgtLocale) throws Exception {
         TM3FuzzyMatchScorer<TestData> oldScorer = FACTORY.getFuzzyMatchScorer();
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             
             // Use a new scorer that only returns one result
             FACTORY.setFuzzyMatchScorer(new TM3FuzzyMatchScorer<TestData>() {
@@ -1953,9 +1944,9 @@ public abstract class TM3Tests {
                 tm.save(srcLocale, new TestData("A B C " + i), TM3Attributes.NONE, tgtLocale, 
                         new TestData("Target " + i), TM3SaveMode.MERGE, currentTestEvent);
             }
-            tx.commit();
+            currentTransaction.commit();
             
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             
             // Search with threshold 50 -- this should pick up both
             TM3LeverageResults<TestData> results = 
@@ -1967,12 +1958,12 @@ public abstract class TM3Tests {
             assertEquals(97, it.next().getScore());
             assertEquals(96, it.next().getScore());
             assertEquals(95, it.next().getScore());
-            tx.commit();
+            currentTransaction.commit();
                     
             cleanupTestDb(manager);
             }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
         finally {
@@ -1982,16 +1973,15 @@ public abstract class TM3Tests {
 
     public void testGetAllTuData(TM3Tm<TestData> tm, TestLocale srcLocale, TestLocale tgtLocale) 
                         throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             // Populate the TM with a bunch of stuff
             for (int i = 0; i < 1000; i++) {
                 tm.save(srcLocale, new TestData(Integer.toString(i)), TM3Attributes.NONE, tgtLocale, 
                         new TestData(Integer.toString(i)), TM3SaveMode.MERGE, currentTestEvent);
             }
-            tx.commit();
-            tx = currentSession.beginTransaction();
+            currentTransaction.commit();
+            currentTransaction = currentSession.beginTransaction();
             
             // Verify the data without range restriction
             TM3Handle<TestData> handle = tm.getAllData(null, null);
@@ -2004,20 +1994,19 @@ public abstract class TM3Tests {
             assertFalse("Too many TU returned", it.hasNext());
             handle.purge();
             assertEquals("purge failed", 0, handle.getCount());
-            tx.commit();
+            currentTransaction.commit();
             cleanupTestDb(manager);
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
     }
 
     public void testGetAllTuDataWithDateRange(TM3Tm<TestData> tm, TestLocale srcLocale, TestLocale tgtLocale) 
             throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             
             // Make a couple fake events
             Date now = new Date();
@@ -2044,8 +2033,8 @@ public abstract class TM3Tests {
                 tm.save(srcLocale, new TestData(Integer.toString(i)), TM3Attributes.NONE, tgtLocale, 
                     new TestData(Integer.toString(i)), TM3SaveMode.MERGE, third);
             }
-            tx.commit();
-            tx = currentSession.beginTransaction();
+            currentTransaction.commit();
+            currentTransaction = currentSession.beginTransaction();
             
             // The date range should encompass only the 'second' event
             Date start = new Date(now.getTime() + 30 * 1000);
@@ -2068,27 +2057,26 @@ public abstract class TM3Tests {
             handle = tm.getAllData(null, null);
             assertEquals("unexpected post-purge tu count", 640, handle.getCount());
             
-            tx.commit();
+            currentTransaction.commit();
             cleanupTestDb(manager);
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
     }
 
     public void testGetTuDataByLocale(TM3Tm<TestData> tm, TestLocale srcLocale, TestLocale tgtLocale) 
                 throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             // Populate the TM with a bunch of stuff
             for (int i = 0; i < 1000; i++) {
                 tm.save(srcLocale, new TestData(Integer.toString(i)), TM3Attributes.NONE, tgtLocale, 
                     new TestData(Integer.toString(i)), TM3SaveMode.MERGE, currentTestEvent);
             }
-            tx.commit();
-            tx = currentSession.beginTransaction();
+            currentTransaction.commit();
+            currentTransaction = currentSession.beginTransaction();
             
             // Verify the data without range restriction
             TM3Handle<TestData> handle = tm.getDataByLocale(tgtLocale, null, null);
@@ -2099,20 +2087,19 @@ public abstract class TM3Tests {
                 assertEquals("Tu value mismatch", Integer.toString(i), it.next().getSourceTuv().getContent().data);
             }
             assertFalse("Too many TU returned", it.hasNext());
-            tx.commit();
+            currentTransaction.commit();
             cleanupTestDb(manager);
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
     }
     
     public void testGetTuDataByLocaleWithDateRange(TM3Tm<TestData> tm, TestLocale srcLocale, TestLocale tgtLocale) 
             throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             
             // Make a couple fake events
             Date now = new Date();
@@ -2139,8 +2126,8 @@ public abstract class TM3Tests {
                 tm.save(srcLocale, new TestData(Integer.toString(i)), TM3Attributes.NONE, tgtLocale, 
                     new TestData(Integer.toString(i)), TM3SaveMode.MERGE, third);
             }
-            tx.commit();
-            tx = currentSession.beginTransaction();
+            currentTransaction.commit();
+            currentTransaction = currentSession.beginTransaction();
             
             // The date range should encompass only the 'second' event
             Date start = new Date(now.getTime() + 30 * 1000);
@@ -2155,20 +2142,19 @@ public abstract class TM3Tests {
             }
             assertFalse("Too many TU returned", it.hasNext());
             
-            tx.commit();
+            currentTransaction.commit();
             cleanupTestDb(manager);
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
     }
 
     public void testGetTuDataById(TM3Tm<TestData> tm, TestLocale srcLocale, TestLocale tgtLocale) 
                         throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             
             TM3Event event = tm.addEvent(0, "test", "event");
             currentSession.flush();
@@ -2183,8 +2169,8 @@ public abstract class TM3Tests {
                     ids.add(tu.getId());
                 }
             }
-            tx.commit();
-            tx = currentSession.beginTransaction();
+            currentTransaction.commit();
+            currentTransaction = currentSession.beginTransaction();
             
             TM3Handle<TestData> handle = tm.getDataById(ids);
             
@@ -2196,9 +2182,9 @@ public abstract class TM3Tests {
             }
             
             handle.purge();
-            tx.commit();
+            currentTransaction.commit();
             
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             
             int actualCount = 0;
             for (TM3Tu<TestData> tu : tm.getDataById(ids)) {
@@ -2207,11 +2193,11 @@ public abstract class TM3Tests {
             
             assertEquals("failed to delete " + actualCount + " tu", 0, actualCount);
             
-            tx.commit();
+            currentTransaction.commit();
             cleanupTestDb(manager);
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
     }
@@ -2223,19 +2209,18 @@ public abstract class TM3Tests {
 
         final TM3Event event = testTm.addEvent(1, "test", null);
         final TM3Attribute attr = testTm.addAttribute("test");
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             currentSession.flush();
-            tx.commit();
+            currentTransaction.commit();
         }
         catch (Exception e) {
             throw new RuntimeException(e);
         }
         finally {
-            if (tx != null) {
-                if (tx.isActive()) {
-                    tx.rollback();
+            if (currentTransaction != null) {
+                if (currentTransaction.isActive()) {
+                    currentTransaction.rollback();
                 }
             }
         }
@@ -2245,7 +2230,7 @@ public abstract class TM3Tests {
                 super(id);
             }
             @Override
-            public void test(Session session, Transaction tx) throws Exception {
+            public void test(Session session, Transaction currentTransaction) throws Exception {
                 TM3Tm<TestData> tm = manager.getTm(session, FACTORY, testTm.getId());
                 tm.createSaver()
                   .tu(new TestData("src1"), srcLocale, event)
@@ -2280,23 +2265,22 @@ public abstract class TM3Tests {
         final TestData origTgtData = new TestData("dst1");
         final TestData newTgtData = new TestData("dst2");
         
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             testTm.createSaver()
                 .tu(srcData, srcLocale, event)
                 .target(origTgtData, tgtLocale, event)
                 .save(TM3SaveMode.MERGE);
             currentSession.flush();
-            tx.commit();
+            currentTransaction.commit();
         }
         catch (Exception e) {
             throw new RuntimeException(e);
         }
         finally {
-            if (tx != null) {
-                if (tx.isActive()) {
-                    tx.rollback();
+            if (currentTransaction != null) {
+                if (currentTransaction.isActive()) {
+                    currentTransaction.rollback();
                 }
             }
         }
@@ -2397,9 +2381,8 @@ public abstract class TM3Tests {
 
     public void testMultipleTargets(TM3Tm<TestData> tm, TestLocale srcLocale, 
             final TestLocale tgtLocale) throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             // Now let's create some segments.
             TestData srcData1 = new TestData("This is source 1");
             TestData tgtData1 = new TestData("This is target 1");
@@ -2409,9 +2392,9 @@ public abstract class TM3Tests {
                  .target(tgtData1, tgtLocale, currentTestEvent)
                  .target(tgtData2, tgtLocale, currentTestEvent)
                  .save(TM3SaveMode.MERGE);
-            tx.commit();
+            currentTransaction.commit();
             
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             // make sure both target tuvs are there
             TM3LeverageResults<TestData> results =
                 tm.findMatches(srcData1, srcLocale, null,  TM3Attributes.NONE, TM3MatchType.EXACT, false);
@@ -2424,21 +2407,20 @@ public abstract class TM3Tests {
                  targetTuvs.get(1).getContent().equals(tgtData2)) ||
                 (targetTuvs.get(0).getContent().equals(tgtData2) &&
                  targetTuvs.get(1).getContent().equals(tgtData1)));
-            tx.commit();
+            currentTransaction.commit();
 
             cleanupTestDb(manager);
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
     }
 
     public void testIdenticalTargets(TM3Tm<TestData> tm, TestLocale srcLocale, 
             final TestLocale tgtLocale) throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             // Now let's create some segments.
             TestData srcData1 = new TestData("This is source 1");
             TestData tgtData1 = new TestData("This is target 1");
@@ -2447,9 +2429,9 @@ public abstract class TM3Tests {
                  .target(tgtData1, tgtLocale, currentTestEvent)
                  .target(tgtData1, tgtLocale, currentTestEvent)
                  .save(TM3SaveMode.MERGE);
-            tx.commit();
+            currentTransaction.commit();
             
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             // make sure there is only one target tuv
             TM3LeverageResults<TestData> results =
                 tm.findMatches(srcData1, srcLocale, null,  TM3Attributes.NONE, TM3MatchType.EXACT, false);
@@ -2458,21 +2440,20 @@ public abstract class TM3Tests {
             List<TM3Tuv<TestData>> targetTuvs = tu.getLocaleTuvs(tgtLocale);
             assertEquals(1, targetTuvs.size());
             assertTrue(targetTuvs.get(0).getContent().equals(tgtData1));
-            tx.commit();
+            currentTransaction.commit();
 
             cleanupTestDb(manager);
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
     }
 
     public void testMerge(TM3Tm<TestData> tm, TestLocale srcLocale, 
             final TestLocale tgtLocale) throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             // Now let's create some segments.
             TestData srcData1 = new TestData("This is source 1");
             TestData tgtData1 = new TestData("This is target 1");
@@ -2481,16 +2462,16 @@ public abstract class TM3Tests {
             saver.tu(srcData1, srcLocale, currentTestEvent)
                  .target(tgtData1, tgtLocale, currentTestEvent)
                  .save(TM3SaveMode.MERGE);
-            tx.commit();
+            currentTransaction.commit();
             
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             saver = tm.createSaver();
             saver.tu(srcData1, srcLocale, currentTestEvent)
                  .target(tgtData2, tgtLocale, currentTestEvent)
                  .save(TM3SaveMode.MERGE);
-            tx.commit();
+            currentTransaction.commit();
 
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             // make sure both target tuvs are there
             TM3LeverageResults<TestData> results =
                 tm.findMatches(srcData1, srcLocale, null,  TM3Attributes.NONE, TM3MatchType.EXACT, false);
@@ -2503,21 +2484,20 @@ public abstract class TM3Tests {
                  targetTuvs.get(1).getContent().equals(tgtData2)) ||
                 (targetTuvs.get(0).getContent().equals(tgtData2) &&
                  targetTuvs.get(1).getContent().equals(tgtData1)));
-            tx.commit();
+            currentTransaction.commit();
 
             cleanupTestDb(manager);
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
     }
 
     public void testMergeIdentical(TM3Tm<TestData> tm, TestLocale srcLocale, 
             final TestLocale tgtLocale) throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             // Now let's create some segments.
             TestData srcData1 = new TestData("This is source 1");
             TestData tgtData1 = new TestData("This is target 1");
@@ -2525,16 +2505,16 @@ public abstract class TM3Tests {
             saver.tu(srcData1, srcLocale, currentTestEvent)
                  .target(tgtData1, tgtLocale, currentTestEvent)
                  .save(TM3SaveMode.MERGE);
-            tx.commit();
+            currentTransaction.commit();
             
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             saver = tm.createSaver();
             saver.tu(srcData1, srcLocale, currentTestEvent)
                  .target(tgtData1, tgtLocale, currentTestEvent)
                  .save(TM3SaveMode.MERGE);
-            tx.commit();
+            currentTransaction.commit();
 
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             // make sure there is only one target tuv
             TM3LeverageResults<TestData> results =
                 tm.findMatches(srcData1, srcLocale, null,  TM3Attributes.NONE, TM3MatchType.EXACT, false);
@@ -2543,21 +2523,20 @@ public abstract class TM3Tests {
             List<TM3Tuv<TestData>> targetTuvs = tu.getLocaleTuvs(tgtLocale);
             assertEquals(1, targetTuvs.size());
             assertTrue(targetTuvs.get(0).getContent().equals(tgtData1));
-            tx.commit();
+            currentTransaction.commit();
 
             cleanupTestDb(manager);
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
     }
 
     public void testMergeWithIdenticalTargets(TM3Tm<TestData> tm, TestLocale srcLocale, 
             final TestLocale tgtLocale) throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             // Now let's create some segments.
             TestData srcData1 = new TestData("This is source 1");
             TestData tgtData1 = new TestData("This is target 1");
@@ -2566,17 +2545,17 @@ public abstract class TM3Tests {
             saver.tu(srcData1, srcLocale, currentTestEvent)
                  .target(tgtData1, tgtLocale, currentTestEvent)
                  .save(TM3SaveMode.MERGE);
-            tx.commit();
+            currentTransaction.commit();
             
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             saver = tm.createSaver();
             saver.tu(srcData1, srcLocale, currentTestEvent)
                  .target(tgtData2, tgtLocale, currentTestEvent)
                  .target(tgtData2, tgtLocale, currentTestEvent)
                  .save(TM3SaveMode.MERGE);
-            tx.commit();
+            currentTransaction.commit();
 
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             // make sure there are just two target tuvs
             TM3LeverageResults<TestData> results =
                 tm.findMatches(srcData1, srcLocale, null,  TM3Attributes.NONE, TM3MatchType.EXACT, false);
@@ -2589,21 +2568,20 @@ public abstract class TM3Tests {
                  targetTuvs.get(1).getContent().equals(tgtData2)) ||
                 (targetTuvs.get(0).getContent().equals(tgtData2) &&
                  targetTuvs.get(1).getContent().equals(tgtData1)));
-            tx.commit();
+            currentTransaction.commit();
 
             cleanupTestDb(manager);
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
     }
 
     public void testOverwrite(TM3Tm<TestData> tm, TestLocale srcLocale, 
             final TestLocale tgtLocale) throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             // Now let's create some segments.
             TestData srcData1 = new TestData("This is source 1");
             TestData tgtData1 = new TestData("This is target 1");
@@ -2612,16 +2590,16 @@ public abstract class TM3Tests {
             saver.tu(srcData1, srcLocale, currentTestEvent)
                  .target(tgtData1, tgtLocale, currentTestEvent)
                  .save(TM3SaveMode.MERGE);
-            tx.commit();
+            currentTransaction.commit();
             
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             saver = tm.createSaver();
             saver.tu(srcData1, srcLocale, currentTestEvent)
                  .target(tgtData2, tgtLocale, currentTestEvent)
                  .save(TM3SaveMode.OVERWRITE);
-            tx.commit();
+            currentTransaction.commit();
 
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             // make sure there is only one target tuv
             TM3LeverageResults<TestData> results =
                 tm.findMatches(srcData1, srcLocale, null,  TM3Attributes.NONE, TM3MatchType.EXACT, false);
@@ -2630,12 +2608,12 @@ public abstract class TM3Tests {
             List<TM3Tuv<TestData>> targetTuvs = tu.getLocaleTuvs(tgtLocale);
             assertEquals(1, targetTuvs.size());
             assertTrue(targetTuvs.get(0).getContent().equals(tgtData2));
-            tx.commit();
+            currentTransaction.commit();
 
             cleanupTestDb(manager);
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
     }
@@ -2644,9 +2622,8 @@ public abstract class TM3Tests {
     // TM3Tu.removeTargetTuvByLocale
     public void testOverwriteOfMultipleTargets(TM3Tm<TestData> tm, TestLocale srcLocale, 
             final TestLocale tgtLocale) throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             // Now let's create some segments.
             TestData srcData1 = new TestData("This is source 1");
             TestData tgtData1 = new TestData("This is target 1");
@@ -2657,16 +2634,16 @@ public abstract class TM3Tests {
                  .target(tgtData1, tgtLocale, currentTestEvent)
                  .target(tgtData2, tgtLocale, currentTestEvent)
                  .save(TM3SaveMode.MERGE);
-            tx.commit();
+            currentTransaction.commit();
             
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             saver = tm.createSaver();
             saver.tu(srcData1, srcLocale, currentTestEvent)
                  .target(tgtData3, tgtLocale, currentTestEvent)
                  .save(TM3SaveMode.OVERWRITE);
-            tx.commit();
+            currentTransaction.commit();
 
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             // make sure there is only one target tuv
             TM3LeverageResults<TestData> results =
                 tm.findMatches(srcData1, srcLocale, null,  TM3Attributes.NONE, TM3MatchType.EXACT, false);
@@ -2675,12 +2652,12 @@ public abstract class TM3Tests {
             List<TM3Tuv<TestData>> targetTuvs = tu.getLocaleTuvs(tgtLocale);
             assertEquals(1, targetTuvs.size());
             assertTrue(targetTuvs.get(0).getContent().equals(tgtData3));
-            tx.commit();
+            currentTransaction.commit();
 
             cleanupTestDb(manager);
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
     }
@@ -2689,9 +2666,8 @@ public abstract class TM3Tests {
     // TM3Tu.removeTargetTuvByLocale
     public void testOverwriteOfMultipleTargetsWithIdentical(TM3Tm<TestData> tm, TestLocale srcLocale, 
             final TestLocale tgtLocale) throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             // Now let's create some segments.
             TestData srcData1 = new TestData("This is source 1");
             TestData tgtData1 = new TestData("This is target 1");
@@ -2701,17 +2677,17 @@ public abstract class TM3Tests {
                  .target(tgtData1, tgtLocale, currentTestEvent)
                  .target(tgtData2, tgtLocale, currentTestEvent)
                  .save(TM3SaveMode.MERGE);
-            tx.commit();
+            currentTransaction.commit();
             
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             saver = tm.createSaver();
             saver.tu(srcData1, srcLocale, currentTestEvent)
                  .target(tgtData1, tgtLocale, currentTestEvent)
                  .target(tgtData2, tgtLocale, currentTestEvent)
                  .save(TM3SaveMode.OVERWRITE);
-            tx.commit();
+            currentTransaction.commit();
 
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             // make sure both target tuvs are there
             TM3LeverageResults<TestData> results =
                 tm.findMatches(srcData1, srcLocale, null,  TM3Attributes.NONE, TM3MatchType.EXACT, false);
@@ -2724,12 +2700,12 @@ public abstract class TM3Tests {
                  targetTuvs.get(1).getContent().equals(tgtData2)) ||
                 (targetTuvs.get(0).getContent().equals(tgtData2) &&
                  targetTuvs.get(1).getContent().equals(tgtData1)));
-            tx.commit();
+            currentTransaction.commit();
 
             cleanupTestDb(manager);
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
     }
@@ -2738,9 +2714,8 @@ public abstract class TM3Tests {
     // targets in that locale, even if they were also new
     public void testOverwriteWithMultipleTargets(TM3Tm<TestData> tm, TestLocale srcLocale, 
             final TestLocale tgtLocale) throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             // Now let's create some segments.
             TestData srcData1 = new TestData("This is source 1");
             TestData tgtData1 = new TestData("This is target 1");
@@ -2750,17 +2725,17 @@ public abstract class TM3Tests {
             saver.tu(srcData1, srcLocale, currentTestEvent)
                  .target(tgtData1, tgtLocale, currentTestEvent)
                  .save(TM3SaveMode.MERGE);
-            tx.commit();
+            currentTransaction.commit();
             
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             saver = tm.createSaver();
             saver.tu(srcData1, srcLocale, currentTestEvent)
                  .target(tgtData2, tgtLocale, currentTestEvent)
                  .target(tgtData3, tgtLocale, currentTestEvent)
                  .save(TM3SaveMode.OVERWRITE);
-            tx.commit();
+            currentTransaction.commit();
 
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             // make sure both target tuvs are there
             TM3LeverageResults<TestData> results =
                 tm.findMatches(srcData1, srcLocale, null,  TM3Attributes.NONE, TM3MatchType.EXACT, false);
@@ -2773,12 +2748,12 @@ public abstract class TM3Tests {
                  targetTuvs.get(1).getContent().equals(tgtData3)) ||
                 (targetTuvs.get(0).getContent().equals(tgtData3) &&
                  targetTuvs.get(1).getContent().equals(tgtData2)));
-            tx.commit();
+            currentTransaction.commit();
 
             cleanupTestDb(manager);
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
     }
@@ -2787,9 +2762,8 @@ public abstract class TM3Tests {
     // second identical target, so tried to save a null tuv
     public void testOverwriteWithIdenticalTargets(TM3Tm<TestData> tm, TestLocale srcLocale, 
             final TestLocale tgtLocale) throws Exception {
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             // Now let's create some segments.
             TestData srcData1 = new TestData("This is source 1");
             TestData tgtData1 = new TestData("This is target 1");
@@ -2798,17 +2772,17 @@ public abstract class TM3Tests {
             saver.tu(srcData1, srcLocale, currentTestEvent)
                  .target(tgtData1, tgtLocale, currentTestEvent)
                  .save(TM3SaveMode.MERGE);
-            tx.commit();
+            currentTransaction.commit();
             
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             saver = tm.createSaver();
             saver.tu(srcData1, srcLocale, currentTestEvent)
                  .target(tgtData2, tgtLocale, currentTestEvent)
                  .target(tgtData2, tgtLocale, currentTestEvent)
                  .save(TM3SaveMode.OVERWRITE);
-            tx.commit();
+            currentTransaction.commit();
 
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             // make sure there is only one target tuv
             TM3LeverageResults<TestData> results =
                 tm.findMatches(srcData1, srcLocale, null,  TM3Attributes.NONE, TM3MatchType.EXACT, false);
@@ -2817,12 +2791,12 @@ public abstract class TM3Tests {
             List<TM3Tuv<TestData>> targetTuvs = tu.getLocaleTuvs(tgtLocale);
             assertEquals(1, targetTuvs.size());
             assertTrue(targetTuvs.get(0).getContent().equals(tgtData2));
-            tx.commit();
+            currentTransaction.commit();
 
             cleanupTestDb(manager);
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
     }
@@ -2834,9 +2808,8 @@ public abstract class TM3Tests {
             final TestLocale tgtLocale) throws Exception {
         FixedValueTestDataFactory factory = new FixedValueTestDataFactory(2L);
         TM3Tm<TestData> tm = manager.getTm(currentSession, factory, currentTestId);
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             // Now let's create some segments.
             TestData srcData1 = 
                 new TestData("This is source 1");
@@ -2848,16 +2821,16 @@ public abstract class TM3Tests {
             saver.tu(srcData1, srcLocale, currentTestEvent)
                  .target(tgtData1, tgtLocale, currentTestEvent)
                  .save(TM3SaveMode.MERGE);
-            tx.commit();
+            currentTransaction.commit();
             
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             saver = tm.createSaver();
             saver.tu(srcData1, srcLocale, currentTestEvent)
                  .target(tgtData2, tgtLocale, currentTestEvent)
                  .save(TM3SaveMode.MERGE);
-            tx.commit();
+            currentTransaction.commit();
 
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             // make sure there is only one target tuv
             TM3LeverageResults<TestData> results =
                 tm.findMatches(srcData1, srcLocale, null,  TM3Attributes.NONE, TM3MatchType.EXACT, false);
@@ -2866,12 +2839,12 @@ public abstract class TM3Tests {
             List<TM3Tuv<TestData>> targetTuvs = tu.getLocaleTuvs(tgtLocale);
             assertEquals(1, targetTuvs.size());
             assertTrue(targetTuvs.get(0).getContent().equals(tgtData1));
-            tx.commit();
+            currentTransaction.commit();
 
             cleanupTestDb(manager);
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
     }
@@ -2884,9 +2857,8 @@ public abstract class TM3Tests {
             TestLocale srcLocale, TestLocale tgtLocale1, 
             TestLocale tgtLocale2) throws Exception {
 
-        Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();
+            currentTransaction = currentSession.beginTransaction();
             // Create three segments in such a way that the TUVs for 
             // French are out of order relative to the TUs.
             TestData srcData1 = 
@@ -2929,8 +2901,8 @@ public abstract class TM3Tests {
                  .save(TM3SaveMode.MERGE);
 
             currentSession.flush();
-            tx.commit();
-            tx = currentSession.beginTransaction();
+            currentTransaction.commit();
+            currentTransaction = currentSession.beginTransaction();
 
             // now when we ask for all fr data, we should get tuvs from 
             // tus 1, 2, and 3 in that order.
@@ -2954,11 +2926,11 @@ public abstract class TM3Tests {
             assertEquals(tu3.getId(), tu.getId());
             assertEquals(srcData3, tu.getSourceTuv().getContent());
             assertFalse("Too many TU returned", it.hasNext());
-            tx.commit();
+            currentTransaction.commit();
             cleanupTestDb(manager);
         }
         catch (Exception e) {
-            tx.rollback();
+            currentTransaction.rollback();
             throw e;
         }
     }
