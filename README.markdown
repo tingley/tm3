@@ -7,13 +7,14 @@ Association)[http://www.tausdata.org].  The code in this repository contains a
 standalone version that can be run on its own or embedded in other tools.  The
 code is adapted from the GlobalSight trunk (version 8.2).
 
-Using TM3 in GlobalSight
---------------------------
-
-As of GlobalSight 8.2, TM3 is not enabled by default; it can be enabled per-company by the superadmin through the settings page for each individual company.
+The code has been deployed in production on individual translation memories of
+over 100 million words apiece.
 
 Design
-------
+======
+
+Data Storage
+------------
 
 TM3 is built entirely on top of MySQL.  However, beyond a few static tables, most of the tables are managed dynamically by the library.  Each logical TM is represented by multiple tables that are collectively referred to as a *tablespace*.
 
@@ -57,7 +58,99 @@ environment in which TM3 is being run, the use of `Session.connection()` may
 leak the connection; the caller will need to implement appropriate logic to
 clean it up.
 
+Embedding
+=========
+
+A tool that uses TM3 needs to implement several interfaces:
+* `TM3Data` - implementation of segment/translation unit data
+* `TM3Locale` - some representation of a source/target locale
+* `TM3FuzzyMatchScorer` - a class capable of producing evaluating fuzzy matches
+* `TM3DataFactory` - factory class to provide implementations of the other 
+   components.
+
+`TM3Data`
+--------
+
+Different tools have different requirements for what segment data must be
+stored in a TM; TM3 supports this by hiding the segment implementation behind
+the `TM3Data` interface.
+
+A `TM3Data` object must be representable as a String in order to be represented
+as a text field in the database.  (Arguably, the schema should store BLOBs
+instead.)  The text representation may simply be the segment content, or it may
+be a more complex representation (eg, XML or JSON) with additional metadata.
+Additionally, the `TM3Data` implementation is responsible for computing its own
+fingerprint for performing exact matches, and producing a set of tokenized
+fingerprints for fuzzy match indexing and retrieval.
+
+`TM3Locale`
+-----------
+
+A representation of a source / target locale.  These may be backed by a
+database table, but do not have to be.  (For example, the unittests use a
+hardcoded set of locales that is represented entirely in memory.)
+
+`TM3FuzzyMatchScorer`
+---------------------
+
+This interface serves as an extension point that allows for different fuzzy match scoring algorithms to be inserted into the leverage engine.
+
+A default implementation of a modified Damerau-Levenshtein edit distance
+calculation can be found in `com.globalsight.ling.tm3.core.EditDistanceScorer`.
+This implementation deviates from the standard algorithm in that it is computed
+by word rather than by character; as a result, the penalties applied may vary
+based on the differences between the words themselves.  To use
+`EditDistanceScorer`, the `TM3Data` implementation must also implement the
+`TM3Scorable` interface.
+
+`TM3DataFactory`
+---------------
+
+The `TM3DataFactory` class is responsible for producing instances of the other
+support classes.  Additionally, the `extendConfiguration()` hook allows the
+implementation to extend the injected Hibernate configuration with any required
+entity mappings.
+
+Exact and Fuzzy Matching
+------------------------
+
+Exact matching is performed by comparison of fingerprints.  Each `TM3Data`
+implementation is responsible for producing its own fingerprints.
+
+Fuzzy matching is performed by a 2-step process: a coarse search to identify
+fuzzy match candidates, followed by a more careful scoring of each candidate.
+Coarse searching is performed via wordwise trigram search, while the scoring is performed by the specified `TM3FuzzyMatchScorer` implementation.
+
+Issues
+======
+
+Write Performance
+-----------------
+
+TM3 is optimized for reading, and writing is slower than I'd like.  This is
+mostly because of the sheer number of rows written to generate the fuzzy
+indexes (1 per trigram, which is equivalent to 1 per source word).  It is also
+suspected (althought not proven) that the distribution of trigram hashes on
+which the fuzzy indexes are built causes poor performance for generation of
+clustered MySQL table indexes.  However, the use of clustered indexes is
+critical to fuzzy lookup performance.
+
+Lastly, exact match lookup time has been identified as a signficant (25%)
+factor in write performance.  The write code performs an exact match lookup
+individually on each candidate segment; this code could probably be optimized.
+
+Concurrent writes
+-----------------
+
+TM3 uses "SELECT...FOR UPDATE" during write operations in order to prevent duplicate source TUs from being written out.  This is not ideal.
+
+Using TM3 in GlobalSight
+==========================
+
+As of GlobalSight 8.2, TM3 is not enabled by default; it can be enabled per-company by the superadmin through the settings page for each individual company.
+
+
 License
--------
+=======
 
 Like GlobalSight itself, all code is released under the Apache 2.0 license.
