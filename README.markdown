@@ -40,7 +40,7 @@ If you don't have a settings.xml already configured, create one
     &lt;settings&gt;  
       &lt;servers&gt; 
         &lt;server&gt;
-          &lt;id&gt;tm3-database-credentials</id>
+          &lt;id&gt;tm3-database-credentials&lt;/id&gt;
           &lt;username&gt;(your database user)&lt;/username&gt;
           &lt;password&gt;(your database password)&lt;/password&gt;
         &lt;/server&gt; 
