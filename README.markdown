@@ -102,6 +102,23 @@ Fuzzy matching is performed by a 2-step process: a coarse search to identify
 fuzzy match candidates, followed by a more careful scoring of each candidate.
 Coarse searching is performed via wordwise trigram search, while the scoring is performed by the specified `TM3FuzzyMatchScorer` implementation.
 
+Attributes and TU Identity
+--------------------------
+
+Each source TU can support arbitrarily many attributes.  Attributes come in two flavors:
+* *Built-in attributes* are stored inline in the TU row data.  They are
+  declared when the TM is created and can't be changed, other than by manually
+  running a bunch of ALTER statements against the database.  However, they
+  offer better performance and some basic data typing.
+* *Ad-hoc attributes* are stored in a dedicated table (per-tablespace).  They
+  can be added or removed at any time.  However, their values must always be
+  Strings, and they are slightly slower.
+
+Each attribute has a flag called `affectsIdentity`.  If a TM has one or more
+identify-affecting attributes, then the same source TUV may exist multiple
+times in the TM, as long as at least one of the identify-affecting attributes
+differs in value.
+
 Issues
 ======
 
@@ -123,7 +140,10 @@ individually on each candidate segment; this code could probably be optimized.
 Concurrent writes
 -----------------
 
-TM3 uses "SELECT...FOR UPDATE" during write operations in order to prevent duplicate source TUs from being written out.  This is not ideal.
+TM3 uses "SELECT...FOR UPDATE" during write operations in order to prevent
+duplicate source TUs from being written out.  However, it also uses Hibernate's
+`Session.lock()` method to lock any Hibernate-managed objects.  None of this is
+really that great.
 
 Building and Testing
 ====================
