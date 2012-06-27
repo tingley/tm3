@@ -10,8 +10,8 @@ code is adapted from the GlobalSight trunk (version 8.2).
 The code has been deployed in production on individual translation memories of
 over 100 million words apiece.
 
-Design
-======
+Technical Stuff
+===============
 
 Data Storage
 ------------
@@ -22,32 +22,6 @@ TM3 can create 3 types of TM:
 * *Bilingual* - A TM that has a dedicated tablespace but only a single source and target locale.  The fixed locales allow for slightly smaller row sizes.
 * *Multilingual* - A TM that has a dedicated tablespace and can support any number of source and target locales.
 * *Multilingual Shared* - A TM that can support any number of source and target locales but does not have a dedicated tablespace.  Rather, its tablespace is a *Storage Pool* shared with one or more other Multilingual Shared TMs.  Multiple Storage Pools are managed separately through the API.  For example, in GlobalSight 8.2, most TM3 TMs use Multilingual Shared, with one Storage Pool allocated for each company in GlobalSight.
-
-Building and Testing
---------------------
-
-GlobalSight is built with ant, but this standalone version of TM3 uses
-[maven](http://maven.apache.org/).
-
-Unittests are heavily database-based.  The 'test' phase will attempt to
-use a database called `tm3_test`, which is cleaned up afterwards.  To do
-this, you must configure a server called `tm3-database-credentials` in
-your `settings.xml` file.
-
-If you don't have a settings.xml already configured, create one 
-(`~/.m2/settings.xml`) that looks like this:
-
-<pre>
-    &lt;settings&gt;  
-      &lt;servers&gt; 
-        &lt;server&gt;
-          &lt;id&gt;tm3-database-credentials&lt;/id&gt;
-          &lt;username&gt;(your database user)&lt;/username&gt;
-          &lt;password&gt;(your database password)&lt;/password&gt;
-        &lt;/server&gt; 
-      &lt;/servers&gt;  
-    &lt;/settings&gt;
-</pre>
 
 Use of Hibernate and SQL
 ------------------------
@@ -150,6 +124,32 @@ Concurrent writes
 -----------------
 
 TM3 uses "SELECT...FOR UPDATE" during write operations in order to prevent duplicate source TUs from being written out.  This is not ideal.
+
+Building and Testing
+====================
+
+GlobalSight is built with ant, but this standalone version of TM3 uses
+[maven](http://maven.apache.org/).
+
+Unittests are heavily database-based.  The 'test' phase will attempt to
+use a database called `tm3_test`, which is cleaned up afterwards.  To do
+this, you must configure a server called `tm3-database-credentials` in
+your `settings.xml` file.
+
+If you don't have a settings.xml already configured, create one 
+(`~/.m2/settings.xml`) that looks like this:
+
+<pre>
+    &lt;settings&gt;  
+      &lt;servers&gt; 
+        &lt;server&gt;
+          &lt;id&gt;tm3-database-credentials&lt;/id&gt;
+          &lt;username&gt;(your database user)&lt;/username&gt;
+          &lt;password&gt;(your database password)&lt;/password&gt;
+        &lt;/server&gt; 
+      &lt;/servers&gt;  
+    &lt;/settings&gt;
+</pre>
 
 Using TM3 in GlobalSight
 ==========================
