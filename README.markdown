@@ -2,8 +2,8 @@ TM3
 ===
 
 "TM3" is the name of the Translation Memory storage engine added to
-(GlobalSight)[http://globalsight.com] as part of work for the (TAUS Data
-Association)[http://www.tausdata.org].  The code in this repository contains a
+[GlobalSight](http://globalsight.com) as part of work for the [TAUS Data
+Association](http://www.tausdata.org).  The code in this repository contains a
 standalone version that can be run on its own or embedded in other tools.  The
 code is adapted from the GlobalSight trunk (version 8.2).
 
@@ -27,19 +27,23 @@ Building and Testing
 --------------------
 
 GlobalSight is built with ant, but this standalone version of TM3 uses
-(maven)[http://maven.apache.org/].
+[maven](http://maven.apache.org/).
 
-Unittests are heavily database-based.  The 'test' phase will attempt to use a database called `tm3_test`, which is cleaned up afterwards.  To do this, you must configure a server called `tm3-database-credentials` in your `settings.xml` file.
+Unittests are heavily database-based.  The 'test' phase will attempt to
+use a database called `tm3_test`, which is cleaned up afterwards.  To do
+this, you must configure a server called `tm3-database-credentials` in
+your `settings.xml` file.
 
-If you don't have a settings.xml already configured, create one (`~/.m2/settings.xml`) that looks like this:
+If you don't have a settings.xml already configured, create one 
+(`~/.m2/settings.xml`) that looks like this:
 
 <pre>
     &lt;settings&gt;  
       &lt;servers&gt; 
         &lt;server&gt;
-          &lt;id&gt;tm3-database-credentials</id>
-          &lt;username&gt;(your database user)</username>
-          &lt;password&gt;(your database password)</password>
+          &lt;id&gt;tm3-database-credentials&lt;/id&gt;
+          &lt;username&gt;(your database user)&lt;/username&gt;
+          &lt;password&gt;(your database password)&lt;/password&gt;
         &lt;/server&gt; 
       &lt;/servers&gt;  
     &lt;/settings&gt;
@@ -47,7 +51,10 @@ If you don't have a settings.xml already configured, create one (`~/.m2/settings
 
 Use of Hibernate and SQL
 ------------------------
-TM3 It makes some use of (Hibernate)[http://hibernate.org], as that is what is used elsewhere in GlobalSight.  However, the bulk of TM3's functionality is implemented as direct SQL calls, because of Hibernate's difficulty in mapping entities to dynamically managed tables.
+TM3 It makes some use of [Hibernate](http://hibernate.org), as that is what 
+is used elsewhere in GlobalSight.  However, the bulk of TM3's functionality 
+is implemented as direct SQL calls, because of Hibernate's difficulty in 
+mapping entities to dynamically managed tables.
 
 Additionally, because it was developed against an old (3.1) version of
 Hibernate, it does not use `Session.doWork()` (which wasn't available).
