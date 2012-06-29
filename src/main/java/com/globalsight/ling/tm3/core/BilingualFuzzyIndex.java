@@ -73,6 +73,9 @@ class BilingualFuzzyIndex<T extends TM3Data>
         if (! lookupTarget) {
             sb.append(" AND isSource = 1");
         }
+        else {
+            sb.append(" AND isSource = 0");
+        }
         if (! inlineAttrs.isEmpty()) {
             sb.append(" AND idx.tuId = tu.id");
             for (Map.Entry<TM3Attribute, Object> e : inlineAttrs.entrySet()) {

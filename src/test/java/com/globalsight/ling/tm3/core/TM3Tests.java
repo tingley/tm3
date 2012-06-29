@@ -185,6 +185,11 @@ public abstract class TM3Tests {
         public String getLanguage() {
             return language;
         }
+        
+        @Override
+        public String toString() {
+            return language + "_" + locale;
+        }
     }
     
     static class TestDataFactory implements TM3DataFactory<TestData> {
@@ -626,6 +631,12 @@ public abstract class TM3Tests {
     @Test
     public void testDataByLocaleOrdering() throws Exception {
         testDataByLocaleOrdering(
+                manager.getTm(currentSession, FACTORY, currentTestId), EN_US, FR_FR, DE_DE);
+    }
+    
+    @Test
+    public void testFuzzyLookupTargetOnlySearchesTargets() throws Exception {
+        testFuzzyLookupTargetOnlySearchesTargets(
                 manager.getTm(currentSession, FACTORY, currentTestId), EN_US, FR_FR, DE_DE);
     }
     
@@ -2935,7 +2946,54 @@ public abstract class TM3Tests {
         }
     }
     
+     public void testFuzzyLookupTargetOnlySearchesTargets(TM3Tm<TestData> tm, 
+             TestLocale srcLocale, TestLocale tgtLocale1, 
+             TestLocale tgtLocale2) throws Exception {
 
+         try {
+             currentTransaction = currentSession.beginTransaction();
+             
+             // Create a pair of TUs:
+             //   A --> B
+             //   C --> A
+             // Then do a reverse (target) fuzzy lookup for "A" and make sure
+             // that only C is found, not B.
+             // 
+             TestData dataA = 
+                 new TestData("A B C D E F G");
+             TestData dataB = 
+                 new TestData("H I J K L M");
+             TestData dataC = 
+                 new TestData("N O P Q R S");
+             tm.setIndexTarget(true);
+             TM3Saver<TestData> saver = tm.createSaver();
+             saver.tu(dataA, srcLocale, currentTestEvent)
+                  .target(dataB, tgtLocale1, currentTestEvent);
+             saver.tu(dataC, srcLocale, currentTestEvent)
+                  .target(dataA, tgtLocale1, currentTestEvent);
+             saver.save(TM3SaveMode.MERGE);
+             currentSession.flush();
+             currentTransaction.commit();
+             currentTransaction = currentSession.beginTransaction();
+
+             TestData fuzzyKey = new TestData("A B C D E F Z");
+             TM3LeverageResults<TestData> results = 
+                     tm.findMatches(fuzzyKey, tgtLocale1, Collections.singleton(srcLocale), 
+                     null, TM3MatchType.ALL, true);
+             assertEquals(1, results.getMatches().size());
+             TM3LeverageMatch<TestData> m = results.getMatches().first();
+             assertEquals(dataA, m.getTuv().getContent());
+             assertEquals(dataC, m.getTu().getSourceTuv().getContent());
+             currentTransaction.commit();
+             cleanupTestDb(manager);
+         }
+         catch (Exception e) {
+             currentTransaction.rollback();
+             throw e;
+         }
+     }
+
+     
     // when it's safe to assume at most one tuv per locale
     private static <T extends TM3Data> TM3Tuv<T> getLocaleTuv(TM3Tu<T> tu, TM3Locale locale) {
         List<TM3Tuv<T>> tuvs = tu.getLocaleTuvs(locale);
