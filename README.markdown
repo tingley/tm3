@@ -145,6 +145,14 @@ duplicate source TUs from being written out.  However, it also uses Hibernate's
 `Session.lock()` method to lock any Hibernate-managed objects.  None of this is
 really that great.
 
+SQL Query Generation
+--------------------
+
+Despite some basic efforts to clean add some query building logic, this
+is nonetheless pretty much a mess.  It's worth investigating whether 
+something like [JDBI](http://www.jdbi.org/) could help bring order to chaos
+here.
+
 Building and Testing
 ====================
 
