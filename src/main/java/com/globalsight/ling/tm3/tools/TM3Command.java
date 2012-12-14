@@ -58,9 +58,6 @@ public abstract class TM3Command {
         // wasting time starting hibernate -- for instance, let delete 
         // bail if there is no argument
         
-        // disable log4j spam
-        Logger.getLogger("org.hibernate").setLevel(Level.INFO);
-
         SessionFactory sessionFactory = getSessionFactory(command);
         session = sessionFactory.openSession();
         try {
