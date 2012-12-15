@@ -28,7 +28,7 @@ public class TestDistributedIds {
         Session session = sessionFactory.openSession();
         Connection conn = session.connection();
         Statement s = conn.createStatement();
-        s.execute("DELETE FROM tm3_id where tableName in ('id1', 'testMultipleThreads')");
+        s.execute("DELETE FROM TM3_ID where tableName in ('id1', 'testMultipleThreads')");
         s.close();
         session.close();
     }
