@@ -23,7 +23,6 @@ public class TM3LeverageResults<T extends TM3Data> {
     
     /**
      * Return the match key that was used to search the TM.
-     * @return
      */
     public T getSource() {
         return source;

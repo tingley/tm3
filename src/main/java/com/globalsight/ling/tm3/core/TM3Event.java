@@ -80,7 +80,6 @@ public class TM3Event {
     /**
      * Generic "argument" field for the event.  For example, for a TMX import,
      * this may be the name of the TMX file imported.  
-     * @return
      */
     public String getArgument() {
         return arg;

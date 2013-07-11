@@ -17,7 +17,6 @@ public class TM3EventLog {
     
     /**
      * Get an Iterable that will return all the events in this log.
-     * @return
      */
     public Iterable<TM3Event> getEvents() throws TM3Exception {
         return events;

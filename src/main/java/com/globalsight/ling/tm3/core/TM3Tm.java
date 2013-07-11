@@ -61,13 +61,13 @@ public interface TM3Tm<T extends TM3Data> {
     
     /**
      * Leverage a single segment, returning some a finite number of exact and
-     * fuzzy matches as specified by {@link MatchType}.  Exact matches are 
+     * fuzzy matches as specified by {@link TM3MatchType}.  Exact matches are 
      * preferentially returned, followed by fuzzy matches in descending order
      * by score.
      * 
      * @param matchKey segment data to match
      * @param sourceLocale source locale
-     * @param targetLocale target locale
+     * @param targetLocales target locale
      * @param attributes source attributes to match, or null
      * @param matchType what type of leveraging to perform
      * @param maxResults maximum number of results to return
@@ -83,11 +83,11 @@ public interface TM3Tm<T extends TM3Data> {
             throws TM3Exception;
     /**
      * Leverage a single segment, returning an unlimited number of exact and
-     * fuzzy matches as specified by {@link MatchType}.  
+     * fuzzy matches as specified by {@link TM3MatchType}.  
      * 
      * @param matchKey segment data to match
      * @param sourceLocale source locale
-     * @param targetLocale target locale
+     * @param targetLocales target locale
      * @param attributes source attributes to match, or null
      * @param matchType what type of leveraging to perform
      * @return {@link TM3LeverageResults}
@@ -101,10 +101,10 @@ public interface TM3Tm<T extends TM3Data> {
     /**
      * Save a simple TUV pair to the segment.  Is this signature really needed? 
      * 
-     * @param sourceLocale locale of source segment
+     * @param srcLocale locale of source segment
      * @param source Source segment data
      * @param attributes segment attributes, if any
-     * @param targetLocale locale of target segment
+     * @param tgtLocale locale of target segment
      * @param target Target segment data
      * @param mode
      * @param event
@@ -149,7 +149,6 @@ public interface TM3Tm<T extends TM3Data> {
      *        translations
      * @param mode
      * @param event
-     * @return
      * @throws TM3Exception
      */
     public TM3Tu<T> save(TM3Locale srcLocale, T source, 
@@ -223,13 +222,11 @@ public interface TM3Tm<T extends TM3Data> {
 
     /**
      * Access events that affect this TM.
-     * @return
      */
     public TM3EventLog getEventLog();
 
     /**
      * Access the data factory used to deserialize TUV content in this TM.
-     * @return
      */
     public TM3DataFactory<T> getDataFactory();
     

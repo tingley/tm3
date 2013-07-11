@@ -44,7 +44,6 @@ public interface TM3Manager {
      * care, since it will attach a single data factory to every instance. 
      * @param session
      * @param factory
-     * @return
      * @throws TM3Exception
      */
     public <T extends TM3Data> List<TM3Tm<T>> getAllTms(Session session, 
@@ -84,7 +83,6 @@ public interface TM3Manager {
      * @param factory
      * @param srcLocale
      * @param tgtLocale
-     * @return
      * @throws TM3Exception
      */
     public <T extends TM3Data> TM3BilingualTm<T> createBilingualTm(
@@ -99,7 +97,6 @@ public interface TM3Manager {
      * 
      * @param session
      * @param factory
-     * @return
      * @throws TM3Exception
      */
     public <T extends TM3Data> TM3Tm<T> createMultilingualTm(Session session,
@@ -113,7 +110,6 @@ public interface TM3Manager {
      * @param session
      * @param factory
      * @param sharedStorageId
-     * @return
      * @throws TM3Exception
      */
     public <T extends TM3Data> TM3SharedTm<T> createMultilingualSharedTm(

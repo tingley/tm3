@@ -107,7 +107,8 @@ public class TM3Tuv<T extends TM3Data> {
      * Returns the most recent event affecting this TUV.  
      * Note that this value can not be set directly; it will be
      * updated automatically to the event passed in calls like
-     * {@link TM3Tm#save()} or {@link TM3Tm#modifyTu(TM3Tu, TM3Event)}.
+     * {@link TM3Tm#save(TM3Locale, TM3Data, Map, TM3Locale, TM3Data,
+     * TM3SaveMode, TM3Event)} or {@link TM3Tm#modifyTu(TM3Tu, TM3Event)}.
      * @return most recent event affecting this tuv
      */
     public TM3Event getLatestEvent() {

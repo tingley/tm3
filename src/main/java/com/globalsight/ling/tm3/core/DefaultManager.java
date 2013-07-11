@@ -76,7 +76,6 @@ public class DefaultManager implements TM3Manager {
      * @param factory
      * @param srcLocale
      * @param tgtLocale
-     * @return
      * @throws TM3Exception
      */
     public <T extends TM3Data> TM3BilingualTm<T> createBilingualTm(
