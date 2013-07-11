@@ -635,9 +635,9 @@ public abstract class TM3Tests {
     }
     
     @Test
-    public void testFuzzyLookupTargetOnlySearchesTargets() throws Exception {
-        testFuzzyLookupTargetOnlySearchesTargets(
-                manager.getTm(currentSession, FACTORY, currentTestId), EN_US, FR_FR, DE_DE);
+    public void testFuzzyLookupKeyLocaleAndLookupTarget() throws Exception {
+        testFuzzyLookupKeyLocaleAndLookupTarget(
+                manager.getTm(currentSession, FACTORY, currentTestId), EN_US, FR_FR);
     }
     
     // 
@@ -678,21 +678,38 @@ public abstract class TM3Tests {
             tm.save(srcLocale, srcData2, null, 
                     tgtLocale, tgtData2, TM3SaveMode.MERGE, currentTestEvent);
             currentTransaction.commit();
-            
+
+            TM3LeverageResults<TestData> results;
+
             // Now let's do an exact match query
             currentTransaction = currentSession.beginTransaction();
             verifyExact(tm, srcData1, srcLocale, tgtData1, tgtLocale, false);
             verifyExact(tm, srcData2, srcLocale, tgtData2, tgtLocale, false);
+
+             // lookupTarget still looks in source
+            currentTransaction = currentSession.beginTransaction();
+            verifyExact(tm, srcData1, srcLocale, tgtData1, tgtLocale, true);
+            verifyExact(tm, srcData2, srcLocale, tgtData2, tgtLocale, true);
+
+            // wrong keyLocale
+            results = tm.findMatches(
+                srcData1, tgtLocale, null, null, TM3MatchType.EXACT, true);
+            expectResults(results);
 
             // exact target match
             verifyExact(tm, tgtData1, tgtLocale, srcData1, srcLocale, true);
             verifyExact(tm, tgtData2, tgtLocale, srcData2, srcLocale, true);
 
             // but not if we don't ask for it
-            TM3LeverageResults<TestData> results =
-                tm.findMatches(tgtData1, tgtLocale, null,  TM3Attributes.NONE, TM3MatchType.ALL, false);
+            results = tm.findMatches(
+                tgtData1, tgtLocale, null, null, TM3MatchType.EXACT, false);
             expectResults(results);
-            
+
+            // wrong keyLocale
+            results = tm.findMatches(
+               tgtData1, srcLocale, null, null, TM3MatchType.EXACT, true);
+            expectResults(results);
+
             currentTransaction.commit();
 
             cleanupTestDb(manager);
@@ -2946,44 +2963,59 @@ public abstract class TM3Tests {
         }
     }
     
-     public void testFuzzyLookupTargetOnlySearchesTargets(TM3Tm<TestData> tm, 
-             TestLocale srcLocale, TestLocale tgtLocale1, 
-             TestLocale tgtLocale2) throws Exception {
+     public void testFuzzyLookupKeyLocaleAndLookupTarget(TM3Tm<TestData> tm,
+             TestLocale srcLocale, TestLocale tgtLocale) throws Exception {
 
          try {
              currentTransaction = currentSession.beginTransaction();
              
-             // Create a pair of TUs:
-             //   A --> B
-             //   C --> A
-             // Then do a reverse (target) fuzzy lookup for "A" and make sure
-             // that only C is found, not B.
-             // 
              TestData dataA = 
                  new TestData("A B C D E F G");
              TestData dataB = 
-                 new TestData("H I J K L M");
-             TestData dataC = 
-                 new TestData("N O P Q R S");
+                 new TestData("H I J K L M N");
              tm.setIndexTarget(true);
              TM3Saver<TestData> saver = tm.createSaver();
              saver.tu(dataA, srcLocale, currentTestEvent)
-                  .target(dataB, tgtLocale1, currentTestEvent);
-             saver.tu(dataC, srcLocale, currentTestEvent)
-                  .target(dataA, tgtLocale1, currentTestEvent);
+                  .target(dataB, tgtLocale, currentTestEvent);
              saver.save(TM3SaveMode.MERGE);
              currentSession.flush();
              currentTransaction.commit();
              currentTransaction = currentSession.beginTransaction();
 
-             TestData fuzzyKey = new TestData("A B C D E F Z");
-             TM3LeverageResults<TestData> results = 
-                     tm.findMatches(fuzzyKey, tgtLocale1, Collections.singleton(srcLocale), 
-                     null, TM3MatchType.ALL, true);
-             assertEquals(1, results.getMatches().size());
-             TM3LeverageMatch<TestData> m = results.getMatches().first();
-             assertEquals(dataA, m.getTuv().getContent());
-             assertEquals(dataC, m.getTu().getSourceTuv().getContent());
+             TestData fuzzyKeyA = new TestData("A B C D E F Z");
+             TestData fuzzyKeyB = new TestData("H I J K L M Z");
+             TM3LeverageResults<TestData> results;
+
+             // Now let's do an exact match query
+             results = tm.findMatches(
+                 fuzzyKeyA, srcLocale, null, null, TM3MatchType.ALL, false);
+             expectResults(results, expected(dataA, false));
+
+             // lookupTarget still looks in source
+             results = tm.findMatches(
+                fuzzyKeyA, srcLocale, null, null, TM3MatchType.ALL, true);
+             expectResults(results, expected(dataA, false));
+
+             // wrong keyLocale
+             results = tm.findMatches(
+                 fuzzyKeyA, tgtLocale, null, null, TM3MatchType.ALL, true);
+             expectResults(results);
+
+             // fuzzy target match
+             results = tm.findMatches(
+                fuzzyKeyB, tgtLocale, null, null, TM3MatchType.ALL, true);
+             expectResults(results, expected(dataB, false));
+
+             // but not if we don't ask for it
+             results = tm.findMatches(
+                fuzzyKeyB, tgtLocale, null, null, TM3MatchType.ALL, false);
+             expectResults(results);
+
+             // wrong keyLocale
+             results = tm.findMatches(
+                fuzzyKeyB, srcLocale, null, null, TM3MatchType.ALL, true);
+             expectResults(results);
+
              currentTransaction.commit();
              cleanupTestDb(manager);
          }

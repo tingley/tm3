@@ -70,11 +70,16 @@ class BilingualFuzzyIndex<T extends TM3Data>
             sb.append(" AND idx.tuvCount > ?").addValue(min);
         }
         sb.append(" AND idx.tuvCount < ?").addValue(max);
-        if (! lookupTarget) {
+        // This is a bit redundant as BilingualTm.findMatches checks that
+        // we're looking for a possible locale, but putting the full logic
+        // here makes it clear.
+        TM3BilingualTm tm = (BilingualTm) getStorage().getTm();
+        if (tm.getSrcLocale().equals(keyLocale)) {
             sb.append(" AND isSource = 1");
-        }
-        else {
+        } else if (tm.getTgtLocale().equals(keyLocale) && lookupTarget) {
             sb.append(" AND isSource = 0");
+        } else {
+            throw new RuntimeException("should not happen");
         }
         if (! inlineAttrs.isEmpty()) {
             sb.append(" AND idx.tuId = tu.id");
