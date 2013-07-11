@@ -402,8 +402,8 @@ public abstract class TM3Tests {
     }
     
     @Test
-    public void testExactMatchWithTargetLocales() throws Exception {
-        testExactMatchWithTargetLocales(
+    public void testExactMatchWithMatchLocales() throws Exception {
+        testExactMatchWithMatchLocales(
                 manager.getTm(currentSession, FACTORY, currentTestId), EN_US, FR_FR, DE_DE);
     }
     
@@ -438,8 +438,8 @@ public abstract class TM3Tests {
     }
     
     @Test
-    public void testFuzzyMatchingWithTargetLocales() throws Exception {
-        testFuzzyMatchingWithTargetLocales(
+    public void testFuzzyMatchingWithMatchLocales() throws Exception {
+        testFuzzyMatchingWithMatchLocales(
                 manager.getTm(currentSession, FACTORY, currentTestId), EN_US, FR_FR, DE_DE);
     }
     
@@ -906,7 +906,7 @@ public abstract class TM3Tests {
         }
     }
     
-    public void testExactMatchWithTargetLocales(TM3Tm<TestData> tm, TestLocale srcLocale, 
+    public void testExactMatchWithMatchLocales(TM3Tm<TestData> tm, TestLocale srcLocale, 
             final TestLocale tgtLocale, final TestLocale altLocale) throws Exception {
         try {
             currentTransaction = currentSession.beginTransaction();
@@ -1211,7 +1211,7 @@ public abstract class TM3Tests {
         }
     }
     
-    public void testFuzzyMatchingWithTargetLocales(TM3Tm<TestData> tm, TestLocale srcLocale, 
+    public void testFuzzyMatchingWithMatchLocales(TM3Tm<TestData> tm, TestLocale srcLocale, 
             final TestLocale tgtLocale, final TestLocale altLocale) throws Exception {
         try {
             currentTransaction = currentSession.beginTransaction();

@@ -60,41 +60,38 @@ public interface TM3Tm<T extends TM3Data> {
     public TM3Tuv<T> getTuv(long id) throws TM3Exception;
     
     /**
-     * Leverage a single segment, returning some a finite number of exact and
+     * Leverage a single segment, returning some a limited number of exact and
      * fuzzy matches as specified by {@link TM3MatchType}.  Exact matches are 
      * preferentially returned, followed by fuzzy matches in descending order
      * by score.
      * 
      * @param matchKey segment data to match
-     * @param sourceLocale source locale
-     * @param targetLocales target locale
-     * @param attributes source attributes to match, or null
+     * @param keyLocale locale of the key
+     * @param matchLocales matches must have a tuv in one of these locales
+     *        (or null for no such restriction)
+     * @param attributes tu attributes to match, or null
      * @param matchType what type of leveraging to perform
+     * @param lookupTarget when false, match only on the source tuv; when
+     *        true, match on all tuvs
      * @param maxResults maximum number of results to return
-     * @param threshold minimum score that must be assigned to a segment for 
-     *        it to be returned as a result
+     * @param threshold minimum score of a fuzzy match for it to be a result
      * @return {@link TM3LeverageResults}
      * @throws TM3Exception
      */
     public TM3LeverageResults<T> findMatches(T matchKey, 
-            TM3Locale sourceLocale, Set<? extends TM3Locale> targetLocales,
+            TM3Locale keyLocale, Set<? extends TM3Locale> matchLocales,
             Map<TM3Attribute, Object> attributes, TM3MatchType matchType, 
             boolean lookupTarget, int maxResults, int threshold)
             throws TM3Exception;
     /**
      * Leverage a single segment, returning an unlimited number of exact and
-     * fuzzy matches as specified by {@link TM3MatchType}.  
-     * 
-     * @param matchKey segment data to match
-     * @param sourceLocale source locale
-     * @param targetLocales target locale
-     * @param attributes source attributes to match, or null
-     * @param matchType what type of leveraging to perform
-     * @return {@link TM3LeverageResults}
-     * @throws TM3Exception
+     * fuzzy (with no threshold) matches as specified by {@link TM3MatchType}.
+     *
+     * @see #findMatches(TM3Data, TM3Locale, Set, Map, TM3MatchType, boolean,
+     *                   int, int)
      */
     public TM3LeverageResults<T> findMatches(T matchKey, 
-            TM3Locale sourceLocale, Set<? extends TM3Locale> targetLocales,
+            TM3Locale keyLocale, Set<? extends TM3Locale> matchLocales,
             Map<TM3Attribute, Object> attributes, TM3MatchType matchType, boolean lookupTarget)
             throws TM3Exception;
  
