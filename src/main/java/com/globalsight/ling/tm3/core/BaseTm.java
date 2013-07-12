@@ -400,6 +400,9 @@ abstract class BaseTm<T extends TM3Data> implements TM3Tm<T> {
                     getInlineAttributes(tuData.attrs);
                 Map<TM3Attribute, String> customAttributes =
                     getCustomAttributes(tuData.attrs);
+                // NB This will find earlier TUs from this call, because the
+                // storage layer writes them straight the the database, not
+                // via the Hibernate cache (which would need to be flushed).
                 TM3Tu<T> tu = findTuForSave(conn, tuData.srcTuv.content, 
                         tuData.srcTuv.locale, inlineAttributes, customAttributes);
                 if (tu == null) {
