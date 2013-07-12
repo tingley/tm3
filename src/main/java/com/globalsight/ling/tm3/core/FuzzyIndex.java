@@ -35,21 +35,23 @@ abstract class FuzzyIndex<T extends TM3Data> {
      * @param open JDBC connection
      * @param key TUV data in the appropriate locale for this index
      * @param keyLocale locale of the key
-     * @param targetLocales candidates must have a tuv in one of these locales
+     * @param matchLocales candidates must have a tuv in one of these locales
      *      (or null for no such restriction)
      * @param attributes attribute values to match
      * @param max maximum number of results to return
+     * @param lookupTarget when false, match only on the source tuv; when
+     *        true, match on all tuvs
      * @return list of TM3Tu representing segments which are potential matches
      *      for the key.  This list is sorted in decreasing order of relevance.
      */
     public List<FuzzyCandidate<T>> lookup(T key, TM3Locale keyLocale,
-          Set<? extends TM3Locale> targetLocales,
+          Set<? extends TM3Locale> matchLocales,
           Map<TM3Attribute, Object> inlineAttributes,
           Map<TM3Attribute, String> customAttributes, int maxResults, 
           boolean lookupTarget) 
               throws SQLException {
         return lookupFingerprints(getFingerprints(key), keyLocale, 
-                    targetLocales, inlineAttributes, customAttributes, maxResults, lookupTarget);
+                    matchLocales, inlineAttributes, customAttributes, maxResults, lookupTarget);
     }
     
     /**
@@ -70,14 +72,14 @@ abstract class FuzzyIndex<T extends TM3Data> {
     
     public abstract void deleteFingerprints(TM3Tuv<T> tuv) throws SQLException;
     
-    // Note for implementors: targetLocales may be null, but will not be empty
+    // Note for implementors: matchLocales may be null, but will not be empty
     protected abstract StatementBuilder getFuzzyLookupQuery(
             List<Long> fingerprints, TM3Locale keyLocale,
-            Set<? extends TM3Locale> targetLocales,
+            Set<? extends TM3Locale> matchLocales,
             Map<TM3Attribute, Object> inlineAttrs, boolean lookupTarget);
     
     protected List<FuzzyCandidate<T>> lookupFingerprints(List<Long> fingerprints,
-            TM3Locale keyLocale, Set<? extends TM3Locale> targetLocales,
+            TM3Locale keyLocale, Set<? extends TM3Locale> matchLocales,
             Map<TM3Attribute, Object> inlineAttributes,
             Map<TM3Attribute, String> customAttributes,
             int maxResults, boolean lookupTarget) throws SQLException {
@@ -88,11 +90,11 @@ abstract class FuzzyIndex<T extends TM3Data> {
             return Collections.emptyList();
         }
         // avoid an awkward case in getFuzzyLookupQuery
-        if (targetLocales != null && targetLocales.isEmpty()) {
+        if (matchLocales != null && matchLocales.isEmpty()) {
             return Collections.emptyList();
         }
         StatementBuilder sb = getFuzzyLookupQuery(fingerprints, keyLocale, 
-                    targetLocales, inlineAttributes, lookupTarget);
+                    matchLocales, inlineAttributes, lookupTarget);
         if (customAttributes.size() > 0) {
             sb = getAttributeMatchWrapper(sb, customAttributes);
         }

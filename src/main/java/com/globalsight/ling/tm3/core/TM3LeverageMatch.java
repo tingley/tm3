@@ -14,7 +14,6 @@ public abstract class TM3LeverageMatch<T extends TM3Data> {
     
     /**
      * Indicates whether or not this is an exact match.
-     * @return
      */
     public abstract boolean isExact();
     
@@ -39,8 +38,6 @@ public abstract class TM3LeverageMatch<T extends TM3Data> {
      * The TUV that was matched.  This may be equivalent to getTu().getSourceTuv(),
      * or it may be one of the target TUVs, depending on how the matching was 
      * performed.
-     * 
-     * @return
      */
     public TM3Tuv<T> getTuv() {
         return tuv;

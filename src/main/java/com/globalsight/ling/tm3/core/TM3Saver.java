@@ -46,7 +46,6 @@ public abstract class TM3Saver<T extends TM3Data> {
      * @param content source content
      * @param locale source locale
      * @param event source tuv event
-     * @return
      */
     public Tu tu(T content, TM3Locale locale, TM3Event event) {
         Tu tu = new Tu(content, locale, event);
@@ -58,7 +57,6 @@ public abstract class TM3Saver<T extends TM3Data> {
      * Update the TM based on the contents of this saver.  This will
      * flush all TU and TUV to the database.
      * @param mode Save mode
-     * @return
      * @throws TM3Exception
      */
     public abstract List<TM3Tu<T>> save(TM3SaveMode mode) throws TM3Exception;
@@ -131,7 +129,6 @@ public abstract class TM3Saver<T extends TM3Data> {
          * for convenience and is equivalent to calling 
          * <tt>saver.save(mode)</tt>.
          * @param mode Save mode
-         * @return
          * @throws TM3Exception
          */
         public List<TM3Tu<T>> save(TM3SaveMode mode) {

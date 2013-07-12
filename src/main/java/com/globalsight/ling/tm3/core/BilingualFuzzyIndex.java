@@ -48,7 +48,7 @@ class BilingualFuzzyIndex<T extends TM3Data>
 
     @Override
     protected StatementBuilder getFuzzyLookupQuery(List<Long> fingerprints,
-                    TM3Locale keyLocale, Set<? extends TM3Locale> targetLocales,
+                    TM3Locale keyLocale, Set<? extends TM3Locale> matchLocales,
                     Map<TM3Attribute, Object> inlineAttrs, boolean lookupTarget) {
         StatementBuilder sb = new StatementBuilder();
         sb.append("SELECT tuvId, tuId, SUM(1) as score FROM ")
@@ -70,11 +70,16 @@ class BilingualFuzzyIndex<T extends TM3Data>
             sb.append(" AND idx.tuvCount > ?").addValue(min);
         }
         sb.append(" AND idx.tuvCount < ?").addValue(max);
-        if (! lookupTarget) {
+        // This is a bit redundant as BilingualTm.findMatches checks that
+        // we're looking for a possible locale, but putting the full logic
+        // here makes it clear.
+        TM3BilingualTm tm = (BilingualTm) getStorage().getTm();
+        if (tm.getSrcLocale().equals(keyLocale)) {
             sb.append(" AND isSource = 1");
-        }
-        else {
+        } else if (tm.getTgtLocale().equals(keyLocale) && lookupTarget) {
             sb.append(" AND isSource = 0");
+        } else {
+            throw new RuntimeException("should not happen");
         }
         if (! inlineAttrs.isEmpty()) {
             sb.append(" AND idx.tuId = tu.id");
@@ -84,11 +89,11 @@ class BilingualFuzzyIndex<T extends TM3Data>
             }
         }
         sb.append(" GROUP BY tuvId ORDER BY score DESC");
-        if (targetLocales != null) {
+        if (matchLocales != null) {
             // an exists subselect seems simpler, but mysql bug 46947 causes
             // exists subselects to take locks even in repeatable read
             List<Long> targetLocaleIds = new ArrayList<Long>();
-            for (TM3Locale locale : targetLocales) {
+            for (TM3Locale locale : matchLocales) {
                 targetLocaleIds.add(locale.getId());
             }
             sb = new StatementBuilder()

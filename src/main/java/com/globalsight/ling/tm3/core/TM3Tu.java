@@ -110,7 +110,6 @@ public class TM3Tu<T extends TM3Data> {
     /**
      * Remove and return all TUV for the specified locale.
      * @param locale
-     * @return
      */
     public void removeTargetTuvByLocale(TM3Locale locale) {
         for (Iterator<TM3Tuv<T>> it = targetTuvs.iterator(); it.hasNext(); ) {
@@ -143,7 +142,6 @@ public class TM3Tu<T extends TM3Data> {
     
     /**
      * Remove all target TUV.
-     * @return
      */
     public void removeTargetTuvs() {
         this.targetTuvs.clear();
@@ -195,7 +193,6 @@ public class TM3Tu<T extends TM3Data> {
     /**
      * Return attributes for this TU.  Only attributes for which a value is set
      * will be returned.
-     * @return
      */
     public Map<TM3Attribute, Object> getAttributes() {
         return attributes;
@@ -204,7 +201,6 @@ public class TM3Tu<T extends TM3Data> {
     /**
      * Return the value for a single attribute.
      * @param attribute
-     * @return
      */
     public Object getAttribute(TM3Attribute attribute) {
         return attributes.get(attribute);

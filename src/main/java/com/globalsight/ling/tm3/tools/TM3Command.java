@@ -84,7 +84,6 @@ public abstract class TM3Command {
     /**
      * Subclasses should override this to indicate that they need
      * a non-null TM3DataFactory to be passed to any TM3Tm instances.
-     * @return
      */
     protected boolean requiresDataFactory() {
         return false;

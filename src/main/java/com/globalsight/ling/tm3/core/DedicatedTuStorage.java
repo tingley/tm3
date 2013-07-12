@@ -282,7 +282,7 @@ class DedicatedTuStorage<T extends TM3Data>  extends TuStorage<T> {
     
     @Override
     protected StatementBuilder getExactMatchStatement(T key, 
-                TM3Locale srcLocale, Set<? extends TM3Locale> targetLocales,
+                TM3Locale srcLocale, Set<? extends TM3Locale> matchLocales,
                 Map<TM3Attribute, Object> inlineAttrs, boolean lookupTarget) {
         StatementBuilder sb = new StatementBuilder()
             .append("SELECT tuv.id, tuv.tuId FROM ")
@@ -304,11 +304,11 @@ class DedicatedTuStorage<T extends TM3Data>  extends TuStorage<T> {
                 }
             }
         }
-        if (targetLocales != null) {
+        if (matchLocales != null) {
             // an exists subselect seems simpler, but mysql bug 46947 causes
             // exists subselects to take locks even in repeatable read
             List<Long> targetLocaleIds = new ArrayList<Long>();
-            for (TM3Locale locale : targetLocales) {
+            for (TM3Locale locale : matchLocales) {
                 targetLocaleIds.add(locale.getId());
             }
             sb = new StatementBuilder()

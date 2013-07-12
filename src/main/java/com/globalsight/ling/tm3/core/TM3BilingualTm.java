@@ -3,7 +3,8 @@ package com.globalsight.ling.tm3.core;
 import java.util.Map;
 
 /**
- * Subinterface for TMs created with {@link TM3Manager#createBilingualTM(long, TM3Locale, TM3Locale)}.
+ * Subinterface for TMs created with {@link TM3Manager#createBilingualTm(
+ * Session, TM3DataFactory, Set, TM3Locale, TM3Locale)}.
  * This exposes access to the fixed source and target locales, as well as 
  * provides simplified methods for some common operations.
  */
@@ -45,7 +46,6 @@ public interface TM3BilingualTm<T extends TM3Data> extends TM3Tm<T> {
      * @param attributes
      * @param matchType
      * @param maxResults
-     * @return
      * @throws TM3Exception
      */
     public TM3LeverageResults<T> findMatches(T matchKey, 
@@ -60,8 +60,7 @@ public interface TM3BilingualTm<T extends TM3Data> extends TM3Tm<T> {
      * @param matchKey
      * @param attributes
      * @param matchType
-     * @param maxResults
-     * @return
+     * @param lookupTarget
      * @throws TM3Exception
      */
     public TM3LeverageResults<T> findMatches(T matchKey, 
