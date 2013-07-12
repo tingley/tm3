@@ -629,8 +629,14 @@ public abstract class TM3Tests {
     }
 
     @Test
-    public void testDataByLocaleOrdering() throws Exception {
-        testDataByLocaleOrdering(
+    public void testDataByLocaleOrderingFlushTus() throws Exception {
+        testDataByLocaleOrderingFlushTus(
+                manager.getTm(currentSession, FACTORY, currentTestId), EN_US, FR_FR, DE_DE);
+    }
+
+    @Test
+    public void testDataByLocaleOrderingSaveMultiple() throws Exception {
+        testDataByLocaleOrderingSaveMultiple(
                 manager.getTm(currentSession, FACTORY, currentTestId), EN_US, FR_FR, DE_DE);
     }
     
@@ -2877,13 +2883,19 @@ public abstract class TM3Tests {
         }
     }
 
-    /**
-     * Make sure that we don't skip TUVs or return them in the wrong order
-     * when using getDataByLocale().  (GBS-2328).
-     */
-     public void testDataByLocaleOrdering(TM3Tm<TestData> tm, 
+    // Helper for the next three tests that allow you to save the TUs in
+    // different ways.  Do what you want, and add the results to tus.
+    interface SaveMethod {
+        void afterOneTu(final List<TM3Tu<TestData>> tus,
+                        TM3Saver<TestData> saver);
+        void afterAllTus(final List<TM3Tu<TestData>> tus,
+                         TM3Saver<TestData> saver);
+    }
+
+    // Template for the next three tests.
+    public void testDataByLocaleOrdering(TM3Tm<TestData> tm,
             TestLocale srcLocale, TestLocale tgtLocale1, 
-            TestLocale tgtLocale2) throws Exception {
+            TestLocale tgtLocale2, SaveMethod sm) throws Exception {
 
         try {
             currentTransaction = currentSession.beginTransaction();
@@ -2900,33 +2912,26 @@ public abstract class TM3Tests {
             TestData tgtData3 = new TestData("This is target 3");
 
             TM3Saver<TestData> saver = tm.createSaver();
+            List<TM3Tu<TestData>> tus = new ArrayList<TM3Tu<TestData>>();
+
             // TU 1, en -> fr tuv
-            TM3Tu<TestData> tu1 = 
-                saver.tu(srcData1, srcLocale, currentTestEvent)
-                 .target(tgtData1, tgtLocale1, currentTestEvent)
-                 .save(TM3SaveMode.MERGE)
-                 .get(0);
-            currentSession.flush();
+            saver.tu(srcData1, srcLocale, currentTestEvent)
+                 .target(tgtData1, tgtLocale1, currentTestEvent);
+            sm.afterOneTu(tus, saver);
             // TU 2, en -> de tuv
-            saver = tm.createSaver();
-            TM3Tu<TestData> tu2 = 
-                saver.tu(srcData2, srcLocale, currentTestEvent)
-                 .target(tgtData2, tgtLocale2, currentTestEvent)
-                 .save(TM3SaveMode.MERGE)
-                 .get(0);
-            currentSession.flush();
+            saver.tu(srcData2, srcLocale, currentTestEvent)
+                 .target(tgtData2, tgtLocale2, currentTestEvent);
+            sm.afterOneTu(tus, saver);
             // TU 3, en -> fr tuv
-            saver = tm.createSaver();
-            TM3Tu<TestData> tu3 = 
-                saver.tu(srcData3, srcLocale, currentTestEvent)
-                 .target(tgtData3, tgtLocale1, currentTestEvent)
-                 .save(TM3SaveMode.MERGE)
-                 .get(0);
-            currentSession.flush();
+            saver.tu(srcData3, srcLocale, currentTestEvent)
+                 .target(tgtData3, tgtLocale1, currentTestEvent);
+            sm.afterOneTu(tus, saver);
             // now go back to tu 2 and add an en -> fr tuv
             saver.tu(srcData2, srcLocale, currentTestEvent)
-                 .target(tgtData2, tgtLocale1, currentTestEvent)
-                 .save(TM3SaveMode.MERGE);
+                 .target(tgtData2, tgtLocale1, currentTestEvent);
+            sm.afterOneTu(tus, saver);
+
+            sm.afterAllTus(tus, saver);
 
             currentSession.flush();
             currentTransaction.commit();
@@ -2941,17 +2946,17 @@ public abstract class TM3Tests {
             Iterator<TM3Tu<TestData>> it = handle.iterator();
             TM3Tu<TestData> tu = it.next();
             assertNotNull(tu);
-            assertEquals(tu1.getId(), tu.getId());
+            assertEquals(tus.get(0).getId(), tu.getId());
             assertEquals(srcData1, tu.getSourceTuv().getContent());
             assertTrue(it.hasNext());
             tu = it.next();
             assertNotNull(tu);
-            assertEquals(tu2.getId(), tu.getId());
+            assertEquals(tus.get(1).getId(), tu.getId());
             assertEquals(srcData2, tu.getSourceTuv().getContent());
             assertTrue(it.hasNext());
             tu = it.next();
             assertNotNull(tu);
-            assertEquals(tu3.getId(), tu.getId());
+            assertEquals(tus.get(2).getId(), tu.getId());
             assertEquals(srcData3, tu.getSourceTuv().getContent());
             assertFalse("Too many TU returned", it.hasNext());
             currentTransaction.commit();
@@ -2962,7 +2967,50 @@ public abstract class TM3Tests {
             throw e;
         }
     }
-    
+
+    /**
+     * Make sure that we don't skip TUVs or return them in the wrong order
+     * when using getDataByLocale().  (GBS-2328).
+     */
+     public void testDataByLocaleOrderingFlushTus(TM3Tm<TestData> tm,
+            TestLocale srcLocale, TestLocale tgtLocale1,
+            TestLocale tgtLocale2) throws Exception {
+
+        testDataByLocaleOrdering(tm, srcLocale, tgtLocale1, tgtLocale2,
+            new SaveMethod() {
+                @Override
+                public void afterOneTu(final List<TM3Tu<TestData>> tus,
+                                       TM3Saver<TestData> saver) {
+                    tus.add(saver.save(TM3SaveMode.MERGE).get(0));
+                    currentSession.flush();
+                }
+                @Override
+                public void afterAllTus(final List<TM3Tu<TestData>> tus,
+                                        TM3Saver<TestData> saver) { }
+            });
+    }
+
+    /**
+     * Verify that if you call TM3Saver.save on multiple TUs, the earlier
+     * ones are found when saving the later ones.
+     */
+    public void testDataByLocaleOrderingSaveMultiple(TM3Tm<TestData> tm,
+            TestLocale srcLocale, TestLocale tgtLocale1,
+            TestLocale tgtLocale2) throws Exception {
+
+        testDataByLocaleOrdering(tm, srcLocale, tgtLocale1, tgtLocale2,
+            new SaveMethod() {
+                @Override
+                public void afterOneTu(final List<TM3Tu<TestData>> tus,
+                                       TM3Saver<TestData> saver) { }
+                @Override
+                public void afterAllTus(final List<TM3Tu<TestData>> tus,
+                                        TM3Saver<TestData> saver) {
+                    tus.addAll(saver.save(TM3SaveMode.MERGE));
+                }
+            });
+    }
+
      public void testFuzzyLookupKeyLocaleAndLookupTarget(TM3Tm<TestData> tm,
              TestLocale srcLocale, TestLocale tgtLocale) throws Exception {
 
