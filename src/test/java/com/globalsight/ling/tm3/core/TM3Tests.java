@@ -73,6 +73,23 @@ public abstract class TM3Tests {
     }
     
     static TestLocale EN_US, FR_FR, DE_DE;
+
+    // Possibly handy data for testing fuzzy matching.  fuzzyKeyN should
+    // match fuzzyDataN (with what threshold?) but not any other fuzzyDataX
+    // (regardless of threshold).  There are probably more places it could
+    // be used below.
+    public static TestData fuzzyData1 = new TestData("A B C D");
+    public static TestData fuzzyData2 = new TestData("E F G H");
+    public static TestData fuzzyData3 = new TestData("I J K L");
+    public static TestData fuzzyData4 = new TestData("M N O P");
+    public static TestData fuzzyData5 = new TestData("Q R S T");
+    public static TestData fuzzyData6 = new TestData("U V W X");
+    public static TestData fuzzyKey1  = new TestData("A B C Z");
+    public static TestData fuzzyKey2  = new TestData("E F G Z");
+    public static TestData fuzzyKey3  = new TestData("I J K Z");
+    public static TestData fuzzyKey4  = new TestData("M N O Z");
+    public static TestData fuzzyKey5  = new TestData("Q R S Z");
+    public static TestData fuzzyKey6  = new TestData("U V W Z");
     
     static Set<TM3Attribute> inlineAttrs() {
         Set<TM3Attribute> r = new HashSet<TM3Attribute>();
