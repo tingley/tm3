@@ -3034,51 +3034,45 @@ public abstract class TM3Tests {
          try {
              currentTransaction = currentSession.beginTransaction();
              
-             TestData dataA = 
-                 new TestData("A B C D E F G");
-             TestData dataB = 
-                 new TestData("H I J K L M N");
              tm.setIndexTarget(true);
              TM3Saver<TestData> saver = tm.createSaver();
-             saver.tu(dataA, srcLocale, currentTestEvent)
-                  .target(dataB, tgtLocale, currentTestEvent);
+             saver.tu(fuzzyData1, srcLocale, currentTestEvent)
+                  .target(fuzzyData2, tgtLocale, currentTestEvent);
              saver.save(TM3SaveMode.MERGE);
              currentSession.flush();
              currentTransaction.commit();
              currentTransaction = currentSession.beginTransaction();
 
-             TestData fuzzyKeyA = new TestData("A B C D E F Z");
-             TestData fuzzyKeyB = new TestData("H I J K L M Z");
              TM3LeverageResults<TestData> results;
 
              // Now let's do an exact match query
              results = tm.findMatches(
-                 fuzzyKeyA, srcLocale, null, null, TM3MatchType.ALL, false);
-             expectResults(results, expected(dataA, false));
+                 fuzzyKey1, srcLocale, null, null, TM3MatchType.ALL, false);
+             expectResults(results, expected(fuzzyData1, false));
 
              // lookupTarget still looks in source
              results = tm.findMatches(
-                fuzzyKeyA, srcLocale, null, null, TM3MatchType.ALL, true);
-             expectResults(results, expected(dataA, false));
+                fuzzyKey1, srcLocale, null, null, TM3MatchType.ALL, true);
+             expectResults(results, expected(fuzzyData1, false));
 
              // wrong keyLocale
              results = tm.findMatches(
-                 fuzzyKeyA, tgtLocale, null, null, TM3MatchType.ALL, true);
+                 fuzzyKey1, tgtLocale, null, null, TM3MatchType.ALL, true);
              expectResults(results);
 
              // fuzzy target match
              results = tm.findMatches(
-                fuzzyKeyB, tgtLocale, null, null, TM3MatchType.ALL, true);
-             expectResults(results, expected(dataB, false));
+                fuzzyKey2, tgtLocale, null, null, TM3MatchType.ALL, true);
+             expectResults(results, expected(fuzzyData2, false));
 
              // but not if we don't ask for it
              results = tm.findMatches(
-                fuzzyKeyB, tgtLocale, null, null, TM3MatchType.ALL, false);
+                fuzzyKey2, tgtLocale, null, null, TM3MatchType.ALL, false);
              expectResults(results);
 
              // wrong keyLocale
              results = tm.findMatches(
-                fuzzyKeyB, srcLocale, null, null, TM3MatchType.ALL, true);
+                fuzzyKey2, srcLocale, null, null, TM3MatchType.ALL, true);
              expectResults(results);
 
              currentTransaction.commit();
