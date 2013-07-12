@@ -127,7 +127,7 @@ public abstract class TM3Saver<T extends TM3Data> {
          * Update the TM based on the contents of this saver.  This will
          * flush all TU and TUV to the database.  This method is provided
          * for convenience and is equivalent to calling 
-         * <tt>saver.save(mode)</tt>.
+         * {@link TM3Saver#save TM3Saver.save}.
          * @param mode Save mode
          * @throws TM3Exception
          */
