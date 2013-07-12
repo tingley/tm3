@@ -667,7 +667,7 @@ public abstract class TM3Tests {
     // Test implementations
     //
     
-    private void verifyExact(TM3Tm<TestData> tm, TestData src, TM3Locale srcLocale,
+    protected void verifyExact(TM3Tm<TestData> tm, TestData src, TM3Locale srcLocale,
                         TestData tgt, TM3Locale tgtLocale, boolean lookupTarget) {
         TM3LeverageResults<TestData> results = 
             tm.findMatches(src, srcLocale, null, null, TM3MatchType.EXACT, lookupTarget);

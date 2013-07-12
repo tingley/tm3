@@ -67,5 +67,56 @@ public class TestBilingualTm extends TM3Tests {
             throw e;
         }
     }
-    
+
+    @Test(expected=TM3Exception.class)
+    public void testBadLocale() throws Exception {
+        testBadLocale(
+                manager.getTm(currentSession, FACTORY, currentTestId), EN_US, FR_FR, DE_DE);
+    }
+
+    /**
+     * An EN_US -> FR_FR bilingual TM should not accept DE_DE data.
+     */
+    public void testBadLocale(TM3Tm<TestData> tm,
+           TestLocale srcLocale, TestLocale goodTgtLocale,
+           TestLocale badTgtLocale) throws Exception {
+        try {
+            currentTransaction = currentSession.beginTransaction();
+            tm.setIndexTarget(true);
+            TM3Saver<TestData> saver = tm.createSaver();
+            saver.tu(fuzzyData1, srcLocale, currentTestEvent)
+                 .target(fuzzyData2, badTgtLocale, currentTestEvent)
+                 .save(TM3SaveMode.MERGE);
+            currentTransaction.commit();
+
+            currentTransaction = currentSession.beginTransaction();
+            TM3LeverageResults<TestData> results;
+
+            // exact match
+            verifyExact(tm, fuzzyData1, srcLocale,
+                            fuzzyData2, badTgtLocale, true);
+
+            // exact target match
+            // this would fail
+            //verifyExact(tm, fuzzyData2, badTgtLocale,
+            //                fuzzyData1, srcLocale, true);
+
+            // fuzzy match
+            results = tm.findMatches(
+               fuzzyKey1, srcLocale, null, null, TM3MatchType.ALL, true);
+            expectResults(results, expected(fuzzyData1, false));
+
+            // fuzzy target match
+            // If we lie about the keyLocale, this succeeds!
+            results = tm.findMatches(
+               fuzzyKey2, goodTgtLocale, null, null, TM3MatchType.ALL, true);
+            expectResults(results, expected(fuzzyData2, false));
+
+            throw new TM3Exception("What, we made it through all that???");
+        }
+        catch (Exception e) {
+            currentTransaction.rollback();
+            throw e;
+        }
+    }
 }
