@@ -490,9 +490,18 @@ abstract class BaseTm<T extends TM3Data> implements TM3Tm<T> {
             Map<TM3Attribute, Object> inlineAttributes,
             Map<TM3Attribute, String> customAttributes)
             throws SQLException {
+        // Don't search on non-identity-affecting attributes.
+        Map<TM3Attribute, Object> identityAffectingInlineAttributes =
+            new HashMap<TM3Attribute, Object>();
+        for (Map.Entry<TM3Attribute, Object> e: inlineAttributes.entrySet()) {
+            if (e.getKey().getAffectsIdentity()) {
+                identityAffectingInlineAttributes.put(e.getKey(), e.getValue());
+            }
+        }
         List<TM3Tuv<T>> tuvs = getStorageInfo().getTuStorage()
                 .getExactMatches(conn, source, srcLocale, null,
-                                 inlineAttributes, customAttributes, false, true);
+                                 identityAffectingInlineAttributes,
+                                 customAttributes, false, true);
         List<TM3Tuv<T>> filtered = new ArrayList<TM3Tuv<T>>();
         int desiredAttrCount = requiredCount(inlineAttributes.keySet()) +
                                requiredCount(customAttributes.keySet());
