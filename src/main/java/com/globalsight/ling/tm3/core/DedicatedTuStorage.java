@@ -298,10 +298,8 @@ class DedicatedTuStorage<T extends TM3Data>  extends TuStorage<T> {
         }
         if (! inlineAttrs.isEmpty()) {
             for (Map.Entry<TM3Attribute, Object> e : inlineAttrs.entrySet()) {
-                if (e.getKey().getAffectsIdentity()) {
-                    sb.append(" AND tu." + e.getKey().getColumnName() + " = ?");
-                    sb.addValue(e.getValue());
-                }
+                sb.append(" AND tu." + e.getKey().getColumnName() + " = ?");
+                sb.addValue(e.getValue());
             }
         }
         if (matchLocales != null) {

@@ -856,6 +856,14 @@ public abstract class TM3Tests {
             assertEquals(tgtLocale, targets.get(0).getLocale());
             assertEquals(tgtData2, targets.get(1).getContent());
             assertEquals(tgtLocale, targets.get(1).getLocale());
+
+            // Previously non-identity-affecting attributes were ignored in
+            // exact matches.
+            results =
+                tm.findMatches(srcData1, srcLocale, null,
+                               TM3Attributes.one(attr2, "nosuch"),
+                               TM3MatchType.EXACT, false);
+            assertEquals(0, results.getMatches().size());
         }
         catch (Exception e) {
             currentTransaction.rollback();
