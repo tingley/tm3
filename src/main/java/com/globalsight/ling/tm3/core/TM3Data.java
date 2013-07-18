@@ -42,14 +42,12 @@ public interface TM3Data {
 
     /**
      * Compute and return the data's fingerprint. 
-     * @return 
      */
     public long getFingerprint();
     
     /**
      * Serialize this TUV data for storage.  This form should be deserializable
      * by a corresponding {@link TM3DataFactory} implementation.
-     * @return
      */
     public String getSerializedForm();
 

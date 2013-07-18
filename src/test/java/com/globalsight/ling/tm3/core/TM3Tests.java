@@ -73,6 +73,23 @@ public abstract class TM3Tests {
     }
     
     static TestLocale EN_US, FR_FR, DE_DE;
+
+    // Possibly handy data for testing fuzzy matching.  fuzzyKeyN should
+    // match fuzzyDataN (with what threshold?) but not any other fuzzyDataX
+    // (regardless of threshold).  There are probably more places it could
+    // be used below.
+    public static TestData fuzzyData1 = new TestData("A B C D");
+    public static TestData fuzzyData2 = new TestData("E F G H");
+    public static TestData fuzzyData3 = new TestData("I J K L");
+    public static TestData fuzzyData4 = new TestData("M N O P");
+    public static TestData fuzzyData5 = new TestData("Q R S T");
+    public static TestData fuzzyData6 = new TestData("U V W X");
+    public static TestData fuzzyKey1  = new TestData("A B C Z");
+    public static TestData fuzzyKey2  = new TestData("E F G Z");
+    public static TestData fuzzyKey3  = new TestData("I J K Z");
+    public static TestData fuzzyKey4  = new TestData("M N O Z");
+    public static TestData fuzzyKey5  = new TestData("Q R S Z");
+    public static TestData fuzzyKey6  = new TestData("U V W Z");
     
     static Set<TM3Attribute> inlineAttrs() {
         Set<TM3Attribute> r = new HashSet<TM3Attribute>();
@@ -402,8 +419,8 @@ public abstract class TM3Tests {
     }
     
     @Test
-    public void testExactMatchWithTargetLocales() throws Exception {
-        testExactMatchWithTargetLocales(
+    public void testExactMatchWithMatchLocales() throws Exception {
+        testExactMatchWithMatchLocales(
                 manager.getTm(currentSession, FACTORY, currentTestId), EN_US, FR_FR, DE_DE);
     }
     
@@ -438,8 +455,8 @@ public abstract class TM3Tests {
     }
     
     @Test
-    public void testFuzzyMatchingWithTargetLocales() throws Exception {
-        testFuzzyMatchingWithTargetLocales(
+    public void testFuzzyMatchingWithMatchLocales() throws Exception {
+        testFuzzyMatchingWithMatchLocales(
                 manager.getTm(currentSession, FACTORY, currentTestId), EN_US, FR_FR, DE_DE);
     }
     
@@ -629,22 +646,28 @@ public abstract class TM3Tests {
     }
 
     @Test
-    public void testDataByLocaleOrdering() throws Exception {
-        testDataByLocaleOrdering(
+    public void testDataByLocaleOrderingFlushTus() throws Exception {
+        testDataByLocaleOrderingFlushTus(
+                manager.getTm(currentSession, FACTORY, currentTestId), EN_US, FR_FR, DE_DE);
+    }
+
+    @Test
+    public void testDataByLocaleOrderingSaveMultiple() throws Exception {
+        testDataByLocaleOrderingSaveMultiple(
                 manager.getTm(currentSession, FACTORY, currentTestId), EN_US, FR_FR, DE_DE);
     }
     
     @Test
-    public void testFuzzyLookupTargetOnlySearchesTargets() throws Exception {
-        testFuzzyLookupTargetOnlySearchesTargets(
-                manager.getTm(currentSession, FACTORY, currentTestId), EN_US, FR_FR, DE_DE);
+    public void testFuzzyLookupKeyLocaleAndLookupTarget() throws Exception {
+        testFuzzyLookupKeyLocaleAndLookupTarget(
+                manager.getTm(currentSession, FACTORY, currentTestId), EN_US, FR_FR);
     }
     
     // 
     // Test implementations
     //
     
-    private void verifyExact(TM3Tm<TestData> tm, TestData src, TM3Locale srcLocale,
+    protected void verifyExact(TM3Tm<TestData> tm, TestData src, TM3Locale srcLocale,
                         TestData tgt, TM3Locale tgtLocale, boolean lookupTarget) {
         TM3LeverageResults<TestData> results = 
             tm.findMatches(src, srcLocale, null, null, TM3MatchType.EXACT, lookupTarget);
@@ -678,21 +701,38 @@ public abstract class TM3Tests {
             tm.save(srcLocale, srcData2, null, 
                     tgtLocale, tgtData2, TM3SaveMode.MERGE, currentTestEvent);
             currentTransaction.commit();
-            
+
+            TM3LeverageResults<TestData> results;
+
             // Now let's do an exact match query
             currentTransaction = currentSession.beginTransaction();
             verifyExact(tm, srcData1, srcLocale, tgtData1, tgtLocale, false);
             verifyExact(tm, srcData2, srcLocale, tgtData2, tgtLocale, false);
+
+             // lookupTarget still looks in source
+            currentTransaction = currentSession.beginTransaction();
+            verifyExact(tm, srcData1, srcLocale, tgtData1, tgtLocale, true);
+            verifyExact(tm, srcData2, srcLocale, tgtData2, tgtLocale, true);
+
+            // wrong keyLocale
+            results = tm.findMatches(
+                srcData1, tgtLocale, null, null, TM3MatchType.EXACT, true);
+            expectResults(results);
 
             // exact target match
             verifyExact(tm, tgtData1, tgtLocale, srcData1, srcLocale, true);
             verifyExact(tm, tgtData2, tgtLocale, srcData2, srcLocale, true);
 
             // but not if we don't ask for it
-            TM3LeverageResults<TestData> results =
-                tm.findMatches(tgtData1, tgtLocale, null,  TM3Attributes.NONE, TM3MatchType.ALL, false);
+            results = tm.findMatches(
+                tgtData1, tgtLocale, null, null, TM3MatchType.EXACT, false);
             expectResults(results);
-            
+
+            // wrong keyLocale
+            results = tm.findMatches(
+               tgtData1, srcLocale, null, null, TM3MatchType.EXACT, true);
+            expectResults(results);
+
             currentTransaction.commit();
 
             cleanupTestDb(manager);
@@ -816,6 +856,14 @@ public abstract class TM3Tests {
             assertEquals(tgtLocale, targets.get(0).getLocale());
             assertEquals(tgtData2, targets.get(1).getContent());
             assertEquals(tgtLocale, targets.get(1).getLocale());
+
+            // Previously non-identity-affecting attributes were ignored in
+            // exact matches.
+            results =
+                tm.findMatches(srcData1, srcLocale, null,
+                               TM3Attributes.one(attr2, "nosuch"),
+                               TM3MatchType.EXACT, false);
+            assertEquals(0, results.getMatches().size());
         }
         catch (Exception e) {
             currentTransaction.rollback();
@@ -906,7 +954,7 @@ public abstract class TM3Tests {
         }
     }
     
-    public void testExactMatchWithTargetLocales(TM3Tm<TestData> tm, TestLocale srcLocale, 
+    public void testExactMatchWithMatchLocales(TM3Tm<TestData> tm, TestLocale srcLocale, 
             final TestLocale tgtLocale, final TestLocale altLocale) throws Exception {
         try {
             currentTransaction = currentSession.beginTransaction();
@@ -1211,7 +1259,7 @@ public abstract class TM3Tests {
         }
     }
     
-    public void testFuzzyMatchingWithTargetLocales(TM3Tm<TestData> tm, TestLocale srcLocale, 
+    public void testFuzzyMatchingWithMatchLocales(TM3Tm<TestData> tm, TestLocale srcLocale, 
             final TestLocale tgtLocale, final TestLocale altLocale) throws Exception {
         try {
             currentTransaction = currentSession.beginTransaction();
@@ -2860,13 +2908,19 @@ public abstract class TM3Tests {
         }
     }
 
-    /**
-     * Make sure that we don't skip TUVs or return them in the wrong order
-     * when using getDataByLocale().  (GBS-2328).
-     */
-     public void testDataByLocaleOrdering(TM3Tm<TestData> tm, 
+    // Helper for the next three tests that allow you to save the TUs in
+    // different ways.  Do what you want, and add the results to tus.
+    interface SaveMethod {
+        void afterOneTu(final List<TM3Tu<TestData>> tus,
+                        TM3Saver<TestData> saver);
+        void afterAllTus(final List<TM3Tu<TestData>> tus,
+                         TM3Saver<TestData> saver);
+    }
+
+    // Template for the next three tests.
+    public void testDataByLocaleOrdering(TM3Tm<TestData> tm,
             TestLocale srcLocale, TestLocale tgtLocale1, 
-            TestLocale tgtLocale2) throws Exception {
+            TestLocale tgtLocale2, SaveMethod sm) throws Exception {
 
         try {
             currentTransaction = currentSession.beginTransaction();
@@ -2883,33 +2937,26 @@ public abstract class TM3Tests {
             TestData tgtData3 = new TestData("This is target 3");
 
             TM3Saver<TestData> saver = tm.createSaver();
+            List<TM3Tu<TestData>> tus = new ArrayList<TM3Tu<TestData>>();
+
             // TU 1, en -> fr tuv
-            TM3Tu<TestData> tu1 = 
-                saver.tu(srcData1, srcLocale, currentTestEvent)
-                 .target(tgtData1, tgtLocale1, currentTestEvent)
-                 .save(TM3SaveMode.MERGE)
-                 .get(0);
-            currentSession.flush();
+            saver.tu(srcData1, srcLocale, currentTestEvent)
+                 .target(tgtData1, tgtLocale1, currentTestEvent);
+            sm.afterOneTu(tus, saver);
             // TU 2, en -> de tuv
-            saver = tm.createSaver();
-            TM3Tu<TestData> tu2 = 
-                saver.tu(srcData2, srcLocale, currentTestEvent)
-                 .target(tgtData2, tgtLocale2, currentTestEvent)
-                 .save(TM3SaveMode.MERGE)
-                 .get(0);
-            currentSession.flush();
+            saver.tu(srcData2, srcLocale, currentTestEvent)
+                 .target(tgtData2, tgtLocale2, currentTestEvent);
+            sm.afterOneTu(tus, saver);
             // TU 3, en -> fr tuv
-            saver = tm.createSaver();
-            TM3Tu<TestData> tu3 = 
-                saver.tu(srcData3, srcLocale, currentTestEvent)
-                 .target(tgtData3, tgtLocale1, currentTestEvent)
-                 .save(TM3SaveMode.MERGE)
-                 .get(0);
-            currentSession.flush();
+            saver.tu(srcData3, srcLocale, currentTestEvent)
+                 .target(tgtData3, tgtLocale1, currentTestEvent);
+            sm.afterOneTu(tus, saver);
             // now go back to tu 2 and add an en -> fr tuv
             saver.tu(srcData2, srcLocale, currentTestEvent)
-                 .target(tgtData2, tgtLocale1, currentTestEvent)
-                 .save(TM3SaveMode.MERGE);
+                 .target(tgtData2, tgtLocale1, currentTestEvent);
+            sm.afterOneTu(tus, saver);
+
+            sm.afterAllTus(tus, saver);
 
             currentSession.flush();
             currentTransaction.commit();
@@ -2924,17 +2971,17 @@ public abstract class TM3Tests {
             Iterator<TM3Tu<TestData>> it = handle.iterator();
             TM3Tu<TestData> tu = it.next();
             assertNotNull(tu);
-            assertEquals(tu1.getId(), tu.getId());
+            assertEquals(tus.get(0).getId(), tu.getId());
             assertEquals(srcData1, tu.getSourceTuv().getContent());
             assertTrue(it.hasNext());
             tu = it.next();
             assertNotNull(tu);
-            assertEquals(tu2.getId(), tu.getId());
+            assertEquals(tus.get(1).getId(), tu.getId());
             assertEquals(srcData2, tu.getSourceTuv().getContent());
             assertTrue(it.hasNext());
             tu = it.next();
             assertNotNull(tu);
-            assertEquals(tu3.getId(), tu.getId());
+            assertEquals(tus.get(2).getId(), tu.getId());
             assertEquals(srcData3, tu.getSourceTuv().getContent());
             assertFalse("Too many TU returned", it.hasNext());
             currentTransaction.commit();
@@ -2945,45 +2992,97 @@ public abstract class TM3Tests {
             throw e;
         }
     }
-    
-     public void testFuzzyLookupTargetOnlySearchesTargets(TM3Tm<TestData> tm, 
-             TestLocale srcLocale, TestLocale tgtLocale1, 
-             TestLocale tgtLocale2) throws Exception {
+
+    /**
+     * Make sure that we don't skip TUVs or return them in the wrong order
+     * when using getDataByLocale().  (GBS-2328).
+     */
+     public void testDataByLocaleOrderingFlushTus(TM3Tm<TestData> tm,
+            TestLocale srcLocale, TestLocale tgtLocale1,
+            TestLocale tgtLocale2) throws Exception {
+
+        testDataByLocaleOrdering(tm, srcLocale, tgtLocale1, tgtLocale2,
+            new SaveMethod() {
+                @Override
+                public void afterOneTu(final List<TM3Tu<TestData>> tus,
+                                       TM3Saver<TestData> saver) {
+                    tus.add(saver.save(TM3SaveMode.MERGE).get(0));
+                    currentSession.flush();
+                }
+                @Override
+                public void afterAllTus(final List<TM3Tu<TestData>> tus,
+                                        TM3Saver<TestData> saver) { }
+            });
+    }
+
+    /**
+     * Verify that if you call TM3Saver.save on multiple TUs, the earlier
+     * ones are found when saving the later ones.
+     */
+    public void testDataByLocaleOrderingSaveMultiple(TM3Tm<TestData> tm,
+            TestLocale srcLocale, TestLocale tgtLocale1,
+            TestLocale tgtLocale2) throws Exception {
+
+        testDataByLocaleOrdering(tm, srcLocale, tgtLocale1, tgtLocale2,
+            new SaveMethod() {
+                @Override
+                public void afterOneTu(final List<TM3Tu<TestData>> tus,
+                                       TM3Saver<TestData> saver) { }
+                @Override
+                public void afterAllTus(final List<TM3Tu<TestData>> tus,
+                                        TM3Saver<TestData> saver) {
+                    tus.addAll(saver.save(TM3SaveMode.MERGE));
+                }
+            });
+    }
+
+     public void testFuzzyLookupKeyLocaleAndLookupTarget(TM3Tm<TestData> tm,
+             TestLocale srcLocale, TestLocale tgtLocale) throws Exception {
 
          try {
              currentTransaction = currentSession.beginTransaction();
              
-             // Create a pair of TUs:
-             //   A --> B
-             //   C --> A
-             // Then do a reverse (target) fuzzy lookup for "A" and make sure
-             // that only C is found, not B.
-             // 
-             TestData dataA = 
-                 new TestData("A B C D E F G");
-             TestData dataB = 
-                 new TestData("H I J K L M");
-             TestData dataC = 
-                 new TestData("N O P Q R S");
              tm.setIndexTarget(true);
              TM3Saver<TestData> saver = tm.createSaver();
-             saver.tu(dataA, srcLocale, currentTestEvent)
-                  .target(dataB, tgtLocale1, currentTestEvent);
-             saver.tu(dataC, srcLocale, currentTestEvent)
-                  .target(dataA, tgtLocale1, currentTestEvent);
+             saver.tu(fuzzyData1, srcLocale, currentTestEvent)
+                  .target(fuzzyData2, tgtLocale, currentTestEvent);
              saver.save(TM3SaveMode.MERGE);
              currentSession.flush();
              currentTransaction.commit();
              currentTransaction = currentSession.beginTransaction();
 
-             TestData fuzzyKey = new TestData("A B C D E F Z");
-             TM3LeverageResults<TestData> results = 
-                     tm.findMatches(fuzzyKey, tgtLocale1, Collections.singleton(srcLocale), 
-                     null, TM3MatchType.ALL, true);
-             assertEquals(1, results.getMatches().size());
-             TM3LeverageMatch<TestData> m = results.getMatches().first();
-             assertEquals(dataA, m.getTuv().getContent());
-             assertEquals(dataC, m.getTu().getSourceTuv().getContent());
+             TM3LeverageResults<TestData> results;
+
+             // Now let's do an exact match query
+             results = tm.findMatches(
+                 fuzzyKey1, srcLocale, null, null, TM3MatchType.ALL, false);
+             expectResults(results, expected(fuzzyData1, false));
+
+             // lookupTarget still looks in source
+             results = tm.findMatches(
+                fuzzyKey1, srcLocale, null, null, TM3MatchType.ALL, true);
+             expectResults(results, expected(fuzzyData1, false));
+
+             // wrong keyLocale
+             results = tm.findMatches(
+                 fuzzyKey1, tgtLocale, null, null, TM3MatchType.ALL, true);
+             expectResults(results);
+
+             // fuzzy target match
+             results = tm.findMatches(
+                fuzzyKey2, tgtLocale, null, null, TM3MatchType.ALL, true);
+             expectResults(results, expected(fuzzyData2, false));
+
+             // but not if we don't ask for it
+             results = tm.findMatches(
+                fuzzyKey2, tgtLocale, null, null, TM3MatchType.ALL, false);
+             expectResults(results);
+
+             // wrong keyLocale
+             results = tm.findMatches(
+                fuzzyKey2, srcLocale, null, null, TM3MatchType.ALL, true);
+             expectResults(results);
+
              currentTransaction.commit();
              cleanupTestDb(manager);
          }

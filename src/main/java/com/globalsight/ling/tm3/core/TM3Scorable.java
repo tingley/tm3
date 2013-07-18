@@ -15,7 +15,6 @@ public interface TM3Scorable<V extends TM3FuzzyComparable<V>> extends TM3Data {
     /**
      * Return objects for scoring.  These should generally correspond to 
      * words or individual markup pieces such as placeholders.
-     * @return
      */
     public List<V> getScoringObjects();
 }

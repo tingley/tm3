@@ -336,16 +336,16 @@ OUTER:  for (FuzzyCandidate<T> candidate : candidates) {
     }
         
     public List<TM3Tuv<T>> getExactMatches(Connection conn, T key, 
-           TM3Locale sourceLocale, Set<? extends TM3Locale> targetLocales,
+           TM3Locale keyLocale, Set<? extends TM3Locale> matchLocales,
            Map<TM3Attribute, Object> inlineAttributes,
            Map<TM3Attribute, String> customAttributes,
            boolean lookupTarget, boolean locking) throws SQLException {
         // avoid an awkward case in getExactMatchStatement
-        if (targetLocales != null && targetLocales.isEmpty()) {
+        if (matchLocales != null && matchLocales.isEmpty()) {
             return Collections.EMPTY_LIST;
         }
-        StatementBuilder sb = getExactMatchStatement(key, sourceLocale, 
-                            targetLocales, inlineAttributes, lookupTarget);
+        StatementBuilder sb = getExactMatchStatement(key, keyLocale,
+                            matchLocales, inlineAttributes, lookupTarget);
         if (locking) {
             sb.append(" FOR UPDATE");
         }
@@ -388,10 +388,10 @@ OUTER:  for (FuzzyCandidate<T> candidate : candidates) {
         return tuvs;
     }
     
-    // Note for implementors: targetLocales may be null, but will not be empty
+    // Note for implementors: matchLocales may be null, but will not be empty
     protected abstract StatementBuilder getExactMatchStatement(T key, 
-                            TM3Locale sourceLocale,
-                            Set<? extends TM3Locale> targetLocales,
+                            TM3Locale keyLocale,
+                            Set<? extends TM3Locale> matchLocales,
                             Map<TM3Attribute, Object> inlineAttrs,
                             boolean lookupTarget);
 

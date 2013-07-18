@@ -119,18 +119,18 @@ class BilingualTm<T extends TM3Data> extends BaseTm<T>
 
     @Override
     public TM3LeverageResults<T> findMatches(T matchKey, 
-            TM3Locale sourceLocale, Set<? extends TM3Locale> targetLocales,
+            TM3Locale keyLocale, Set<? extends TM3Locale> matchLocales,
             Map<TM3Attribute, Object> attributes, TM3MatchType matchType, 
             boolean lookupTarget, int maxResults, int threshold)
                 throws TM3Exception {
         // A bilingual TM will always return zero results if the requested
         // locale is not the TM's source locale, unless we are doing
         // reverse leverage (and the requested locale is the TM's target locale).
-        if (!sourceLocale.equals(getSrcLocale()) &&
-            !(lookupTarget && sourceLocale.equals(getTgtLocale()))) {
+        if (!keyLocale.equals(getSrcLocale()) &&
+            !(lookupTarget && keyLocale.equals(getTgtLocale()))) {
             return new TM3LeverageResults(matchKey, attributes);
         }
-        return super.findMatches(matchKey, sourceLocale, targetLocales,
+        return super.findMatches(matchKey, keyLocale, matchLocales,
                         attributes, matchType, lookupTarget, maxResults,
                         threshold);
     }

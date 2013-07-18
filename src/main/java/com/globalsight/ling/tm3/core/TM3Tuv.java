@@ -14,7 +14,7 @@ public class TM3Tuv<T extends TM3Data> {
     private Long id;
     private TM3Locale locale;
     private String serializedData;
-    private long fingerprint;
+    private Long fingerprint;
     private TM3Tu<T> tu;
     private TM3Event firstEvent, latestEvent;
 
@@ -57,7 +57,14 @@ public class TM3Tuv<T extends TM3Data> {
     }
     
     public long getFingerprint() {
+        if (fingerprint == null) {
+            calculateFingerprint();
+        }
         return fingerprint;
+    }
+    
+    private void calculateFingerprint() {
+        fingerprint = data.getFingerprint();
     }
     
     protected void setFingerprint(long fingerprint) {
@@ -84,7 +91,8 @@ public class TM3Tuv<T extends TM3Data> {
         this.data = data;
         // Update the fields that are persisted into the DB
         this.serializedData = data.getSerializedForm();
-        this.fingerprint = data.getFingerprint();
+        // Compute the fingerprint lazily
+        this.fingerprint = null;
     }
     
     public TM3Event getFirstEvent() {
@@ -99,7 +107,8 @@ public class TM3Tuv<T extends TM3Data> {
      * Returns the most recent event affecting this TUV.  
      * Note that this value can not be set directly; it will be
      * updated automatically to the event passed in calls like
-     * {@link TM3Tm#save()} or {@link TM3Tm#modifyTu(TM3Tu, TM3Event)}.
+     * {@link TM3Tm#save(TM3Locale, TM3Data, Map, TM3Locale, TM3Data,
+     * TM3SaveMode, TM3Event)} or {@link TM3Tm#modifyTu(TM3Tu, TM3Event)}.
      * @return most recent event affecting this tuv
      */
     public TM3Event getLatestEvent() {

@@ -160,10 +160,14 @@ GlobalSight is built with ant, but this standalone version of TM3 uses
 [maven](http://maven.apache.org/).
 
 Unittests are heavily database-based.  The 'test' phase will attempt to
-use a database called `tm3_test`, which is cleaned up afterwards.  To do
-this, you must configure a server called `tm3-database-credentials` in
-your `settings.xml` file.
+use a database called `tm3_test`, which is cleaned up afterwards.  It
+requires a mysql user `tm3`, which you can create with:
 
+    create user 'tm3' identified by 'tm3';
+    grant all privileges on tm3_test.* to 'tm3';
+
+You must also configure a server called `tm3-database-credentials` in
+your `settings.xml` file.
 If you don't have a settings.xml already configured, create one 
 (`~/.m2/settings.xml`) that looks like this:
 
@@ -172,8 +176,8 @@ If you don't have a settings.xml already configured, create one
       &lt;servers&gt; 
         &lt;server&gt;
           &lt;id&gt;tm3-database-credentials&lt;/id&gt;
-          &lt;username&gt;(your database user)&lt;/username&gt;
-          &lt;password&gt;(your database password)&lt;/password&gt;
+          &lt;username&gt;tm3&lt;/username&gt;
+          &lt;password&gt;tm3&lt;/password&gt;
         &lt;/server&gt; 
       &lt;/servers&gt;  
     &lt;/settings&gt;

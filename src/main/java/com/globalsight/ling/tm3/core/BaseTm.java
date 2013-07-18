@@ -190,23 +190,24 @@ abstract class BaseTm<T extends TM3Data> implements TM3Tm<T> {
 
     @Override
     public TM3LeverageResults<T> findMatches(T matchKey, 
-            TM3Locale sourceLocale, Set<? extends TM3Locale> targetLocales,
-            Map<TM3Attribute, Object> attributes, TM3MatchType matchType, boolean lookupTarget) 
+            TM3Locale keyLocale, Set<? extends TM3Locale> matchLocales,
+            Map<TM3Attribute, Object> attributes, TM3MatchType matchType,
+            boolean lookupTarget)
             throws TM3Exception {
-        return findMatches(matchKey, sourceLocale, targetLocales, 
+        return findMatches(matchKey, keyLocale, matchLocales,
                            attributes, matchType, lookupTarget, 
                            Integer.MAX_VALUE, 0);
     }
     
     @Override
     public TM3LeverageResults<T> findMatches(T matchKey, 
-                TM3Locale sourceLocale, Set<? extends TM3Locale> targetLocales,
+                TM3Locale keyLocale, Set<? extends TM3Locale> matchLocales,
                 Map<TM3Attribute, Object> attributes, TM3MatchType matchType, 
                 boolean lookupTarget, int maxResults, int threshold)
                 throws TM3Exception {
         if (LOGGER.isDebugEnabled()) {
-            LOGGER.debug("findMatches: key=" + matchKey + ", srcLoc=" + 
-                    sourceLocale + ", type=" + matchType + ", max=" + 
+            LOGGER.debug("findMatches: key=" + matchKey + ", keyLoc=" +
+                    keyLocale + ", type=" + matchType + ", max=" +
                     maxResults + ", threhold=" + threshold);
         }
         if (attributes == null) {
@@ -223,20 +224,20 @@ abstract class BaseTm<T extends TM3Data> implements TM3Tm<T> {
         try {
             switch (matchType) {
             case EXACT:
-                getExactMatches(conn, results, matchKey, sourceLocale, targetLocales, inlineAttributes, customAttributes, maxResults, lookupTarget);
+                getExactMatches(conn, results, matchKey, keyLocale, matchLocales, inlineAttributes, customAttributes, maxResults, lookupTarget);
                 break;
             case ALL:
-                count = getExactMatches(conn, results, matchKey, sourceLocale, targetLocales, inlineAttributes, customAttributes, maxResults, lookupTarget);
+                count = getExactMatches(conn, results, matchKey, keyLocale, matchLocales, inlineAttributes, customAttributes, maxResults, lookupTarget);
                 if (count < maxResults) {
-                    getFuzzyMatches(conn, results, matchKey, sourceLocale, 
-                                targetLocales, inlineAttributes, customAttributes, maxResults, threshold, lookupTarget);
+                    getFuzzyMatches(conn, results, matchKey, keyLocale,
+                                matchLocales, inlineAttributes, customAttributes, maxResults, threshold, lookupTarget);
                 }
                 break;
             case FALLBACK:
-                count = getExactMatches(conn, results, matchKey, sourceLocale, targetLocales, inlineAttributes, customAttributes, maxResults, lookupTarget);
+                count = getExactMatches(conn, results, matchKey, keyLocale, matchLocales, inlineAttributes, customAttributes, maxResults, lookupTarget);
                 if (count == 0) {
-                    getFuzzyMatches(conn, results, matchKey, sourceLocale, 
-                                        targetLocales, inlineAttributes, customAttributes, maxResults, threshold, lookupTarget);
+                    getFuzzyMatches(conn, results, matchKey, keyLocale,
+                                        matchLocales, inlineAttributes, customAttributes, maxResults, threshold, lookupTarget);
                 }
                 break;
             }
@@ -248,8 +249,8 @@ abstract class BaseTm<T extends TM3Data> implements TM3Tm<T> {
 
     protected int getExactMatches(Connection conn,
             TM3LeverageResults<T> results,
-            T matchKey, TM3Locale sourceLocale, 
-            Set<? extends TM3Locale> targetLocales,
+            T matchKey, TM3Locale keyLocale,
+            Set<? extends TM3Locale> matchLocales,
             Map<TM3Attribute, Object> inlineAttributes,
             Map<TM3Attribute, String> customAttributes,
             int maxResults,
@@ -258,8 +259,8 @@ abstract class BaseTm<T extends TM3Data> implements TM3Tm<T> {
         int count = 0;
         long start = System.currentTimeMillis();
         List<TM3Tuv<T>> exactTuv = getStorageInfo().getTuStorage()
-            .getExactMatches(conn, matchKey, sourceLocale, 
-                         targetLocales, inlineAttributes, customAttributes, lookupTarget, false);
+            .getExactMatches(conn, matchKey, keyLocale,
+                         matchLocales, inlineAttributes, customAttributes, lookupTarget, false);
         for (TM3Tuv<T> exactMatch : exactTuv) {
             if (count++ >= maxResults) {
                 break;
@@ -279,7 +280,7 @@ abstract class BaseTm<T extends TM3Data> implements TM3Tm<T> {
     
     protected void getFuzzyMatches(Connection conn,
             TM3LeverageResults<T> results, T matchKey,
-            TM3Locale sourceLocale, Set<? extends TM3Locale> targetLocales,
+            TM3Locale keyLocale, Set<? extends TM3Locale> matchLocales,
             Map<TM3Attribute, Object> inlineAttributes,
             Map<TM3Attribute, String> customAttributes,
             int maxResults, int threshold,
@@ -292,7 +293,7 @@ abstract class BaseTm<T extends TM3Data> implements TM3Tm<T> {
         }
         
         List<FuzzyCandidate<T>> candidates = getStorageInfo().getFuzzyIndex()
-                .lookup(matchKey, sourceLocale, targetLocales,
+                .lookup(matchKey, keyLocale, matchLocales,
                         inlineAttributes, customAttributes, maxResults, lookupTarget);
 
         SortedSet<FuzzyCandidate<T>> sorted = 
@@ -301,7 +302,7 @@ abstract class BaseTm<T extends TM3Data> implements TM3Tm<T> {
         // Score and sort all the results, then select best maxResults
         for (FuzzyCandidate<T> candidate : candidates) {
             float score = getDataFactory().getFuzzyMatchScorer()
-                    .score(matchKey, candidate.getContent(), sourceLocale); 
+                    .score(matchKey, candidate.getContent(), keyLocale);
             // Fix any errant scoring
             if (score < 0) score = 0;
             if (score > 1) score = 1;
@@ -399,6 +400,9 @@ abstract class BaseTm<T extends TM3Data> implements TM3Tm<T> {
                     getInlineAttributes(tuData.attrs);
                 Map<TM3Attribute, String> customAttributes =
                     getCustomAttributes(tuData.attrs);
+                // NB This will find earlier TUs from this call, because the
+                // storage layer writes them straight the the database, not
+                // via the Hibernate cache (which would need to be flushed).
                 TM3Tu<T> tu = findTuForSave(conn, tuData.srcTuv.content, 
                         tuData.srcTuv.locale, inlineAttributes, customAttributes);
                 if (tu == null) {
@@ -486,9 +490,18 @@ abstract class BaseTm<T extends TM3Data> implements TM3Tm<T> {
             Map<TM3Attribute, Object> inlineAttributes,
             Map<TM3Attribute, String> customAttributes)
             throws SQLException {
+        // Don't search on non-identity-affecting attributes.
+        Map<TM3Attribute, Object> identityAffectingInlineAttributes =
+            new HashMap<TM3Attribute, Object>();
+        for (Map.Entry<TM3Attribute, Object> e: inlineAttributes.entrySet()) {
+            if (e.getKey().getAffectsIdentity()) {
+                identityAffectingInlineAttributes.put(e.getKey(), e.getValue());
+            }
+        }
         List<TM3Tuv<T>> tuvs = getStorageInfo().getTuStorage()
                 .getExactMatches(conn, source, srcLocale, null,
-                                 inlineAttributes, customAttributes, false, true);
+                                 identityAffectingInlineAttributes,
+                                 customAttributes, false, true);
         List<TM3Tuv<T>> filtered = new ArrayList<TM3Tuv<T>>();
         int desiredAttrCount = requiredCount(inlineAttributes.keySet()) +
                                requiredCount(customAttributes.keySet());

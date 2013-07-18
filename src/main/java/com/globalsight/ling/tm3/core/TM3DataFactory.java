@@ -37,7 +37,6 @@ public interface TM3DataFactory<T extends TM3Data> {
 
     /**
      * Return the fuzzy scorer to be used to compare these objects.
-     * @return
      */
     public TM3FuzzyMatchScorer<T> getFuzzyMatchScorer();
     

@@ -59,8 +59,7 @@
               <goal>execute</goal>
             </goals>
             <configuration>
-              <!-- need another database to drop the targeted one -->
-              <url>jdbc:mysql://localhost:3306/mysql</url>
+              <url>jdbc:mysql://localhost:3306/information_schema</url>
               <autocommit>true</autocommit>
               <sqlCommand>drop database tm3_test</sqlCommand>
               <!-- ignore error when database is not avaiable -->
@@ -75,7 +74,7 @@
               <goal>execute</goal>
             </goals>
             <configuration>
-              <url>jdbc:mysql://localhost:3306/mysql</url>
+              <url>jdbc:mysql://localhost:3306/information_schema</url>
               <!-- no transaction -->
               <autocommit>true</autocommit>
               <sqlCommand>create database tm3_test</sqlCommand>
