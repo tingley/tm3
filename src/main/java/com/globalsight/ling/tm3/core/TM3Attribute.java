@@ -6,7 +6,7 @@ package com.globalsight.ling.tm3.core;
 public class TM3Attribute {
     private long id;
     private String name;
-    private BaseTm tm;
+    private BaseTm<?> tm;
     private TM3AttributeValueType valueType;
     private String columnName;
     private boolean affectsIdentity = true;
@@ -16,7 +16,7 @@ public class TM3Attribute {
     /**
      * Used to add a new custom attribute.
      */
-    TM3Attribute(BaseTm tm, String name) {
+    TM3Attribute(BaseTm<?> tm, String name) {
         this.tm = tm;
         this.name = name;
         this.valueType = new TM3AttributeValueType.CustomType();
@@ -54,10 +54,12 @@ public class TM3Attribute {
         return valueType;
     }
 
+    @SuppressWarnings("unused")
     private String getValueTypeClass() {
         return valueType.getClass().getName();
     }
 
+    @SuppressWarnings("unused")
     private void setValueTypeClass(String valueTypeClass) {
         try {
             Class<?> c = Class.forName(valueTypeClass);
@@ -79,6 +81,7 @@ public class TM3Attribute {
         return columnName == null;
     }
 
+    @SuppressWarnings("unused")
     private void setColumnName(String columnName) {
         this.columnName = columnName;
     }
@@ -87,16 +90,18 @@ public class TM3Attribute {
         return affectsIdentity;
     }
     
+    @SuppressWarnings("unused")
     private void setAffectsIdentity(boolean affectsIdentity) {
         this.affectsIdentity = affectsIdentity;
     }
     
+    @SuppressWarnings("rawtypes")
     TM3Tm getTm() {
         return tm;
     }
     
     // called by DefaultManager to attach a "declaration" to a TM
-    void setTm(BaseTm tm) {
+    void setTm(BaseTm<?> tm) {
         this.tm = tm;
     }
     

@@ -1,6 +1,5 @@
 package com.globalsight.ling.tm3.core;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**

@@ -73,7 +73,7 @@ class BilingualFuzzyIndex<T extends TM3Data>
         // This is a bit redundant as BilingualTm.findMatches checks that
         // we're looking for a possible locale, but putting the full logic
         // here makes it clear.
-        TM3BilingualTm tm = (BilingualTm) getStorage().getTm();
+        TM3BilingualTm<T> tm = (BilingualTm<T>) getStorage().getTm();
         if (tm.getSrcLocale().equals(keyLocale)) {
             sb.append(" AND isSource = 1");
         } else if (tm.getTgtLocale().equals(keyLocale) && lookupTarget) {

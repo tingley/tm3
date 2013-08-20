@@ -4,9 +4,6 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
-import java.util.Set;
-import java.util.HashSet;
-
 import org.hibernate.Transaction;
 import org.junit.After;
 import org.junit.Before;

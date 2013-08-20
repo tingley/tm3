@@ -19,7 +19,6 @@ public class TM3Tuv<T extends TM3Data> {
     private TM3Event firstEvent, latestEvent;
 
     private T data; // Transient
-    private TM3EventLog eventLog;
     private TuStorage<T> storage;
 
     TM3Tuv() { }

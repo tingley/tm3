@@ -128,7 +128,7 @@ class BilingualTm<T extends TM3Data> extends BaseTm<T>
         // reverse leverage (and the requested locale is the TM's target locale).
         if (!keyLocale.equals(getSrcLocale()) &&
             !(lookupTarget && keyLocale.equals(getTgtLocale()))) {
-            return new TM3LeverageResults(matchKey, attributes);
+            return new TM3LeverageResults<T>(matchKey, attributes);
         }
         return super.findMatches(matchKey, keyLocale, matchLocales,
                         attributes, matchType, lookupTarget, maxResults,

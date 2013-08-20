@@ -6,6 +6,8 @@ package com.globalsight.ling.tm3.core;
  *
  */
 public class TM3Exception extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+
     public TM3Exception(String s) {
         super(s);
     }

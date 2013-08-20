@@ -1,14 +1,9 @@
 package com.globalsight.ling.tm3.core.persistence;
 
-import java.sql.ResultSet;
-import java.sql.PreparedStatement;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.sql.Statement;
-
 import org.hibernate.Session;
 
-import com.globalsight.ling.tm3.core.TM3Exception;
 import com.globalsight.ling.tm3.core.persistence.StatementBuilder;
 
 /**

@@ -1,6 +1,5 @@
 package com.globalsight.ling.tm3.core;
 
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -223,7 +222,7 @@ public class TM3Tu<T extends TM3Data> {
         if (o == null || !(o instanceof TM3Tu)) {
             return false;
         }
-        TM3Tu tu = (TM3Tu)o;
+        TM3Tu<T> tu = (TM3Tu<T>)o;
         if (getId() == null && tu.getId() == null) {
             return this == tu;
         }

@@ -52,7 +52,7 @@ abstract class StorageInfo<T extends TM3Data> {
         return id;
     }
     
-    public TM3Manager getManager() {
+    public TM3Manager<T> getManager() {
         return tm.getManager();
     }
 

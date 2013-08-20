@@ -2,8 +2,6 @@ package com.globalsight.ling.tm3.core;
 
 import java.util.Comparator;
 
-import com.globalsight.ling.tm3.core.TM3LeverageResults.MatchComparator;
-
 /**
  * Data representing a fuzzy match candidate that can be 
  * scored or used to bootstrap a full TU with additional

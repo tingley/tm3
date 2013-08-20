@@ -29,6 +29,7 @@ class MultilingualSharedTm<T extends TM3Data> extends BaseTm<T>
         return sharedStorageId;
     }
     
+    @SuppressWarnings("unused")
     private void setSharedStorageId(long sharedStorageId) {
         this.sharedStorageId = sharedStorageId;
     }

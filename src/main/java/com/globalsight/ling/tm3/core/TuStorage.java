@@ -20,7 +20,6 @@ import org.hibernate.Session;
 import org.hibernate.jdbc.ReturningWork;
 import org.hibernate.jdbc.Work;
 
-import com.globalsight.ling.tm3.core.persistence.BatchStatementBuilder;
 import com.globalsight.ling.tm3.core.persistence.SQLUtil;
 import com.globalsight.ling.tm3.core.persistence.StatementBuilder;
 
@@ -350,7 +349,7 @@ OUTER:  for (FuzzyCandidate<T> candidate : candidates) {
            boolean lookupTarget, boolean locking) throws SQLException {
         // avoid an awkward case in getExactMatchStatement
         if (matchLocales != null && matchLocales.isEmpty()) {
-            return Collections.EMPTY_LIST;
+            return Collections.emptyList();
         }
         StatementBuilder sb = getExactMatchStatement(key, keyLocale,
                             matchLocales, inlineAttributes, lookupTarget);

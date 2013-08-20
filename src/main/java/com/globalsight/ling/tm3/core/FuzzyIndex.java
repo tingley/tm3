@@ -110,8 +110,8 @@ abstract class FuzzyIndex<T extends TM3Data> {
                 List<Long> ids = new ArrayList<Long>();
                 while (rs.next()) {
                     long tuvId = rs.getLong(1);
-                    long tuId = rs.getLong(2); // Currently unused!
-                    int score = rs.getInt(3); // Currently unused!
+                    //long tuId = rs.getLong(2); // Currently unused!
+                    //int score = rs.getInt(3); // Currently unused!
                     ids.add(tuvId);
                 }
                 ps.close();

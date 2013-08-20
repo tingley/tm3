@@ -5,8 +5,6 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 
-import com.globalsight.ling.tm3.core.AbstractDataHandle.TuIterator;
-
 /**
  * A handle to the entire TM.
  */

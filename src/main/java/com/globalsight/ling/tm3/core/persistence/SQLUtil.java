@@ -53,7 +53,6 @@ public class SQLUtil {
      * @throws SQLException
      */
     public static void exec(Connection conn, String sql) throws SQLException {
-        String label = null;
         exec(conn, sql, findLabel());
     }
 
@@ -76,7 +75,6 @@ public class SQLUtil {
        
     public static ResultSet execQuery(Statement statement, String sql) 
                                         throws SQLException {
-        String label = null;
         return execQuery(statement, sql, findLabel());
     }
     

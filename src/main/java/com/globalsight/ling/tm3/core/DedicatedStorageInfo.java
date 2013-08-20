@@ -1,6 +1,5 @@
 package com.globalsight.ling.tm3.core;
 
-import java.util.List;
 import java.sql.Connection;
 import java.sql.SQLException;
 

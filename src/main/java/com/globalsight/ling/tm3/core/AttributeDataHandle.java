@@ -6,8 +6,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Date;
 
-import com.globalsight.ling.tm3.core.AbstractDataHandle.TuIterator;
-
 class AttributeDataHandle<T extends TM3Data> extends
         AbstractDataHandle<T> {
     private Map<TM3Attribute, Object> inlineAttrs;
