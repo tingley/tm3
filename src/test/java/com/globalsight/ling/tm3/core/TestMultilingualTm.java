@@ -19,14 +19,15 @@ public class TestMultilingualTm extends TM3Tests {
     
     // Set up a bilingual TM for each test, start a fresh hibernate session, etc
     @Before
+    @Override
     public void beforeTest() throws Exception {
-        currentSession = sessionFactory.openSession();
+        super.beforeTest();
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
             System.out.println("Creating TM id " + currentTestId);
             TM3Tm<TestData> tm = manager.createMultilingualTm(
-                    currentSession, FACTORY, inlineAttrs());
+                    FACTORY, inlineAttrs());
             currentSession.flush();
             currentTestId = tm.getId();
             currentTestEvent = tm.addEvent(0, "test", "test " + currentTestId);
@@ -47,12 +48,12 @@ public class TestMultilingualTm extends TM3Tests {
     public void testCreateMultilingualTm() throws Exception {
         Transaction tx = null;
         try {
-            TM3Tm<TestData> tm2 = manager.getTm(currentSession, FACTORY, currentTestId);
+            TM3Tm<TestData> tm2 = manager.getTm(FACTORY, currentTestId);
             assertNotNull(tm2);
             assertTrue(tm2 instanceof MultilingualTm);
             cleanupTestDb(manager);
             
-            TM3Tm<TestData> tm3 = manager.getTm(currentSession, FACTORY, currentTestId);
+            TM3Tm<TestData> tm3 = manager.getTm(FACTORY, currentTestId);
             assertNull(tm3);
         }
         catch (Exception e) {

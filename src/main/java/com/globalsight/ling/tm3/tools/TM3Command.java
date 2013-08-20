@@ -35,7 +35,7 @@ import com.globalsight.ling.tm3.core.persistence.SQLUtil;
 @SuppressWarnings("static-access")
 public abstract class TM3Command {
 
-    private TM3Manager manager;
+    private TM3Manager<?> manager;
     private Properties properties = new Properties();
     private ClassLoader classLoader;
     private TM3DataFactory<?> factory;
@@ -65,7 +65,7 @@ public abstract class TM3Command {
                 SQLUtil.getLogger().setLevel(Level.DEBUG);
             }
             transaction = session.beginTransaction();
-            manager = DefaultManager.create();
+            manager = DefaultManager.create(session);
             handle(session, command);
             transaction.commit();
         }
@@ -94,11 +94,11 @@ public abstract class TM3Command {
     }
     
     @SuppressWarnings("unchecked")
-    protected TM3Tm getTm(Session session, String arg) {
+    protected TM3Tm getTm(String arg) {
         TM3Tm tm = null;
         try {
             long id = Long.valueOf(arg);
-            tm = getManager().getTm(session, getDataFactory(), id);
+            tm = getManager().getTm(getDataFactory(), id);
         }
         catch (NumberFormatException e) { }
         return tm;

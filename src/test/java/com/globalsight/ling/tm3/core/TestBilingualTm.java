@@ -22,13 +22,14 @@ public class TestBilingualTm extends TM3Tests {
     
     // Set up a bilingual TM for each test, start a fresh hibernate session, etc
     @Before
+    @Override
     public void beforeTest() throws Exception {
-        currentSession = sessionFactory.openSession();
+        super.beforeTest();
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
             System.out.println("Creating TM id " + currentTestId);
-            TM3Tm<TestData> tm = manager.createBilingualTm(currentSession, FACTORY, inlineAttrs(), EN_US, FR_FR);
+            TM3Tm<TestData> tm = manager.createBilingualTm(FACTORY, inlineAttrs(), EN_US, FR_FR);
             currentSession.flush();
             currentTestId = tm.getId();
             currentTestEvent = tm.addEvent(0, "test", "test " + currentTestId);
@@ -52,12 +53,12 @@ public class TestBilingualTm extends TM3Tests {
     public void testCreateBilingualTm() throws Exception {
         Transaction tx = null;
         try {
-            TM3Tm<TestData> tm2 = manager.getTm(currentSession, FACTORY, currentTestId);
+            TM3Tm<TestData> tm2 = manager.getTm(FACTORY, currentTestId);
             assertNotNull(tm2);
             assertTrue(tm2 instanceof TM3BilingualTm);
             cleanupTestDb(manager);
             
-            TM3Tm<TestData> tm3 = manager.getTm(currentSession, FACTORY, currentTestId);
+            TM3Tm<TestData> tm3 = manager.getTm(FACTORY, currentTestId);
             assertNull(tm3);
         }
         catch (Exception e) {
@@ -69,7 +70,7 @@ public class TestBilingualTm extends TM3Tests {
     @Test(expected=TM3Exception.class)
     public void testBadLocale() throws Exception {
         testBadLocale(
-                manager.getTm(currentSession, FACTORY, currentTestId), EN_US, FR_FR, DE_DE);
+                manager.getTm(FACTORY, currentTestId), EN_US, FR_FR, DE_DE);
     }
 
     /**

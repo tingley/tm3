@@ -49,11 +49,11 @@ class ShowTmCommand extends TM3Command {
         List<String> args = command.getArgList();
         if (args.size() == 0) {
             TM3DataFactory factory = getDataFactory();
-            showAll(getManager().getAllTms(session, factory), f);
+            showAll(getManager().getAllTms(factory), f);
         }
         else {
             for (String a : args) {
-                TM3Tm tm = getTm(session, a);
+                TM3Tm tm = getTm(a);
                 if (tm == null) {
                     System.err.println("Skipping '" +a+ "' - not a valid id");
                     continue;

@@ -19,7 +19,7 @@ class CreateSharedTmCommand extends CreateTmCommand {
         String s = command.getOptionValue(STORAGE);
         int i = Integer.valueOf(s);
         return getManager().createMultilingualSharedTm(
-                session, null, Collections.EMPTY_SET, i); 
+                null, Collections.EMPTY_SET, i); 
                    // (Integer)command.getParsedOptionValue(STORAGE));
     }
 

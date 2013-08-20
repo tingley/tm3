@@ -7,29 +7,34 @@ import java.util.Set;
 
 import org.hibernate.HibernateException;
 import org.hibernate.Session;
+import org.hibernate.jdbc.ReturningWork;
 
 /**
  * Top-level interface for interacting with TM3.
- * 
+ * <p>
+ * DefaultManager instances are <b>not thread safe</b>.
  */
-public class DefaultManager implements TM3Manager {
+public class DefaultManager<T extends TM3Data> implements TM3Manager<T> {
     
-    private DefaultManager() {
+    private Session session;
+    
+    private DefaultManager(Session session) {
+        this.session = session;
     }
         
-    public static TM3Manager create() {
-        return new DefaultManager();
+    public static <T extends TM3Data> TM3Manager<T> create(Session session) {
+        return new DefaultManager<T>(session);
     }
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T extends TM3Data> List<TM3Tm<T>> getAllTms(Session session, 
+    public List<TM3Tm<T>> getAllTms( 
             TM3DataFactory<T> factory) throws TM3Exception {
         try {
-            List<? extends TM3Tm> tms = session.createCriteria(BaseTm.class).list();
-            for (TM3Tm t : tms) {
+            List<? extends TM3Tm<T>> tms = session.createCriteria(BaseTm.class).list();
+            for (TM3Tm<T> t : tms) {
                 BaseTm<T> tm = (BaseTm<T>)t;
-                injectTm(session, tm, factory);
+                injectTm(tm, factory);
             }
             return (List<TM3Tm<T>>) tms;
         }
@@ -40,12 +45,12 @@ public class DefaultManager implements TM3Manager {
 
     
     @SuppressWarnings("unchecked")
-    public <T extends TM3Data> TM3Tm<T> getTm(Session session, 
+    public TM3Tm<T> getTm( 
             TM3DataFactory<T> factory, long id) throws TM3Exception {
         try {
             BaseTm<T> tm = (BaseTm<T>)session.get(BaseTm.class, id);
             if (tm != null) {
-                injectTm(session, tm, factory);
+                injectTm(tm, factory);
             }
             return tm;
         }
@@ -55,10 +60,10 @@ public class DefaultManager implements TM3Manager {
     }
 
     @SuppressWarnings("unchecked")
-    public <T extends TM3Data> TM3BilingualTm<T> getBilingualTm(
-            Session session, TM3DataFactory<T> factory, long id) 
+    public TM3BilingualTm<T> getBilingualTm(
+            TM3DataFactory<T> factory, long id) 
             throws TM3Exception {
-        TM3Tm<T> tm = getTm(session, factory, id);
+        TM3Tm<T> tm = getTm(factory, id);
         if (tm == null) {
             return null;
         }
@@ -78,8 +83,8 @@ public class DefaultManager implements TM3Manager {
      * @param tgtLocale
      * @throws TM3Exception
      */
-    public <T extends TM3Data> TM3BilingualTm<T> createBilingualTm(
-            Session session, TM3DataFactory<T> factory, 
+    public TM3BilingualTm<T> createBilingualTm(
+            TM3DataFactory<T> factory, 
             Set<TM3Attribute> inlineAttributes,
             TM3Locale srcLocale, TM3Locale tgtLocale) 
             throws TM3Exception {
@@ -93,22 +98,6 @@ public class DefaultManager implements TM3Manager {
         
         try {
             return init(new BilingualTm<T>(factory, srcLocale, tgtLocale),
-                        session, inlineAttributes);
-        }
-        catch (SQLException e) {
-            throw new TM3Exception(e);
-        }
-        catch (HibernateException e) {
-            throw new TM3Exception(e);
-        }
-    }
-    
-    public <T extends TM3Data> TM3Tm<T> createMultilingualTm(Session session,
-            TM3DataFactory<T> factory, Set<TM3Attribute> inlineAttributes)
-            throws TM3Exception {
-        
-        try {
-            return init(new MultilingualTm<T>(factory), session,
                         inlineAttributes);
         }
         catch (SQLException e) {
@@ -118,15 +107,30 @@ public class DefaultManager implements TM3Manager {
             throw new TM3Exception(e);
         }
     }
+    
+    public TM3Tm<T> createMultilingualTm(
+            TM3DataFactory<T> factory, Set<TM3Attribute> inlineAttributes)
+            throws TM3Exception {
+        
+        try {
+            return init(new MultilingualTm<T>(factory), inlineAttributes);
+        }
+        catch (SQLException e) {
+            throw new TM3Exception(e);
+        }
+        catch (HibernateException e) {
+            throw new TM3Exception(e);
+        }
+    }
 
-    public <T extends TM3Data> TM3SharedTm<T> createMultilingualSharedTm(
-            Session session, TM3DataFactory<T> factory,
+    public TM3SharedTm<T> createMultilingualSharedTm(
+            TM3DataFactory<T> factory,
             Set<TM3Attribute> inlineAttributes, long sharedStorageId) 
             throws TM3Exception {
     
         try {
             return init(new MultilingualSharedTm<T>(sharedStorageId, factory),
-                        session, inlineAttributes);
+                        inlineAttributes);
         }
         catch (SQLException e) {
             throw new TM3Exception(e);
@@ -142,7 +146,7 @@ public class DefaultManager implements TM3Manager {
      * @param tm
      * @throws TM3Exception
      */
-    public <T extends TM3Data> void removeTm(Session session, TM3Tm<T> tm) 
+    public void removeTm(TM3Tm<T> tm) 
                         throws TM3Exception {
         try {
             StorageInfo<T> storage = ((BaseTm<T>)tm).getStorageInfo();
@@ -155,7 +159,7 @@ public class DefaultManager implements TM3Manager {
     }
     
     private <T extends TM3Data, K extends BaseTm<T>> K init(K tm, 
-            Session session, Set<TM3Attribute> inlineAttributes)
+            Set<TM3Attribute> inlineAttributes)
             throws SQLException, HibernateException {
         tm.setManager(this);
         tm.setSession(session);
@@ -170,7 +174,7 @@ public class DefaultManager implements TM3Manager {
     }
     
     private <T extends TM3Data, V extends BaseTm<T>> V injectTm(
-                    Session session, V tm, TM3DataFactory<T> factory) {
+                    V tm, TM3DataFactory<T> factory) {
         tm.setDataFactory(factory);
         tm.setSession(session);
         tm.setManager(this);
@@ -178,24 +182,34 @@ public class DefaultManager implements TM3Manager {
     }
 
     @Override
-    public boolean createStoragePool(Connection conn, long id,
-            Set<TM3Attribute> inlineAttributes) throws TM3Exception {
-        try {
-            return new SharedStorageTables(conn, id).create(inlineAttributes);
-        }
-        catch (SQLException e) {
-            throw new TM3Exception(e);
-        }
+    public boolean createStoragePool(final long id,
+            final Set<TM3Attribute> inlineAttributes) throws TM3Exception {
+        return session.doReturningWork(new ReturningWork<Boolean>() {
+            @Override
+            public Boolean execute(Connection conn) throws SQLException {
+                try {
+                   return new SharedStorageTables(conn, id).create(inlineAttributes);
+                }
+                catch (SQLException e) {
+                    throw new TM3Exception(e);
+                }
+            }
+        });
     }
 
     @Override
-    public boolean removeStoragePool(Connection conn, long id) throws TM3Exception {
-        try {
-            return new SharedStorageTables(conn, id).destroy();
-        }
-        catch (SQLException e) {
-            throw new TM3Exception(e);
-        }
+    public boolean removeStoragePool(final long id) throws TM3Exception {
+        return session.doReturningWork(new ReturningWork<Boolean>() {
+            @Override
+            public Boolean execute(Connection conn) throws SQLException {
+                try {
+                   return new SharedStorageTables(conn, id).destroy();
+                }
+                catch (SQLException e) {
+                    throw new TM3Exception(e);
+                }
+            }
+        });
     }
 
 }

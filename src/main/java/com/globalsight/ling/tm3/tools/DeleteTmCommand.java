@@ -55,7 +55,7 @@ class DeleteTmCommand extends TM3Command {
         boolean doDelete = command.hasOption(FORCE);
         
         String arg = command.getArgs()[0];
-        TM3Tm<?> tm = getTm(session, arg);
+        TM3Tm<?> tm = getTm(arg);
         if (tm == null) {
             System.out.println("Ignoring '" + arg + "' - not a valid id");
         }
@@ -70,7 +70,7 @@ class DeleteTmCommand extends TM3Command {
             }
         }
         if (doDelete) {
-            getManager().removeTm(session, tm);
+            getManager().removeTm(tm);
             System.out.println("Removed TM " + arg);
         }
     }

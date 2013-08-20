@@ -50,7 +50,7 @@ class AddAttributeCommand extends TM3Command {
     @Override
     protected void handle(Session session, CommandLine command)
             throws Exception {
-        TM3Tm<?> tm = getTm(session, command.getOptionValue(TM));
+        TM3Tm<?> tm = getTm(command.getOptionValue(TM));
         if (tm == null) {
             die("Not a valid TM id: '" + command.getOptionValue(TM) + "'");
         }

@@ -52,8 +52,12 @@ public abstract class TM3Tests {
         EN_US = new TestLocale(1, "en", "US");
         FR_FR = new TestLocale(2, "fr", "FR");
         DE_DE = new TestLocale(3, "de", "DE");
-        
-        manager = DefaultManager.create();
+    }
+    
+    // All subclasses should call this in a @Before method!
+    public void beforeTest() throws Exception {
+        currentSession = sessionFactory.openSession();
+        manager = DefaultManager.create(currentSession);
     }
     
     // This leaves the tm in the db for later inspection.
@@ -69,6 +73,8 @@ public abstract class TM3Tests {
         if (currentSession != null && currentSession.isOpen()) {
             currentSession.close();
         }
+        
+        manager = null;
     }
     
     static TestLocale EN_US, FR_FR, DE_DE;
@@ -112,7 +118,7 @@ public abstract class TM3Tests {
     @SuppressWarnings("unchecked")
     public static void cleanAllDbs() throws SQLException {
         Session session = sessionFactory.openSession();
-        TM3Manager manager = DefaultManager.create();
+        TM3Manager manager = DefaultManager.create(session);
         Transaction tx = null;
         try {
             tx = session.beginTransaction();
@@ -121,7 +127,7 @@ public abstract class TM3Tests {
             for (BaseTm<?> tm : tms) {
                 System.out.println("Cleaning up TM " + tm.getId());
                 tm.setSession(session);
-                manager.removeTm(session, tm);
+                manager.removeTm(tm);
             }
 
             tx.commit();
@@ -309,9 +315,9 @@ public abstract class TM3Tests {
     // Remove the DB used by the current test
     void cleanupTestDb(TM3Manager manager) throws Exception {
         Transaction tx = currentSession.beginTransaction();            
-        TM3Tm<TestData> tm = manager.getTm(currentSession, FACTORY, currentTestId);
+        TM3Tm<TestData> tm = manager.getTm(FACTORY, currentTestId);
         if (tm != null) {
-            manager.removeTm(currentSession, tm);
+            manager.removeTm(tm);
         }
         tx.commit();
     }
@@ -383,259 +389,259 @@ public abstract class TM3Tests {
     @Test
     public void testExactMatch() throws Exception {
         testExactMatch(
-                manager.getTm(currentSession, FACTORY, currentTestId), EN_US, FR_FR);
+                manager.getTm(FACTORY, currentTestId), EN_US, FR_FR);
     }
     
     @Test
     public void testUnicodeContent() throws Exception {
         testUnicodeContent(
-                manager.getTm(currentSession, FACTORY, currentTestId), EN_US, FR_FR);
+                manager.getTm(FACTORY, currentTestId), EN_US, FR_FR);
     }
 
     
     @Test
     public void testExactMatchingWithAttrs() throws Exception {
         testExactMatchingWithAttrs(
-                manager.getTm(currentSession, FACTORY, currentTestId), EN_US, FR_FR);
+                manager.getTm(FACTORY, currentTestId), EN_US, FR_FR);
     }
     
     @Test
     public void testExactMachingWithNonIdentityAttributes() throws Exception {
         testExactMachingWithNonIdentityAttributes(
-                manager.getTm(currentSession, FACTORY, currentTestId), EN_US, FR_FR);
+                manager.getTm(FACTORY, currentTestId), EN_US, FR_FR);
     }
     
     @Test
     public void testExactMatchingWithInlineAttrs() throws Exception {
         testExactMatchingWithInlineAttrs(
-                manager.getTm(currentSession, FACTORY, currentTestId), EN_US, FR_FR);
+                manager.getTm(FACTORY, currentTestId), EN_US, FR_FR);
     }
     
     @Test
     public void testExactMatchingWithNoResults() throws Exception {
         testExactMatchingWithNoResults(
-                manager.getTm(currentSession, FACTORY, currentTestId), EN_US, FR_FR);
+                manager.getTm(FACTORY, currentTestId), EN_US, FR_FR);
     }
     
     @Test
     public void testExactMatchWithMatchLocales() throws Exception {
         testExactMatchWithMatchLocales(
-                manager.getTm(currentSession, FACTORY, currentTestId), EN_US, FR_FR, DE_DE);
+                manager.getTm(FACTORY, currentTestId), EN_US, FR_FR, DE_DE);
     }
     
     @Test
     public void testFuzzyMatching() throws Exception {
         testFuzzyMatching(
-                manager.getTm(currentSession, FACTORY, currentTestId), EN_US, FR_FR);
+                manager.getTm(FACTORY, currentTestId), EN_US, FR_FR);
     }
     
     @Test
     public void testFuzzyTargetMatching() throws Exception {
         testFuzzyTargetMatching(
-                manager.getTm(currentSession, FACTORY, currentTestId), EN_US, FR_FR);
+                manager.getTm(FACTORY, currentTestId), EN_US, FR_FR);
     }
     
     @Test
     public void testFuzzyMatchingWithAttributes() throws Exception {
         testFuzzyMatchingWithAttributes(
-                manager.getTm(currentSession, FACTORY, currentTestId), EN_US, FR_FR);
+                manager.getTm(FACTORY, currentTestId), EN_US, FR_FR);
     }
     
     @Test
     public void testFuzzyMatchingWithInlineAttributes() throws Exception {
         testFuzzyMatchingWithInlineAttributes(
-                manager.getTm(currentSession, FACTORY, currentTestId), EN_US, FR_FR);
+                manager.getTm(FACTORY, currentTestId), EN_US, FR_FR);
     }
     
     @Test
     public void testFuzzyMatchingWithNoResults() throws Exception {
         testFuzzyMatchingWithNoResults(
-                manager.getTm(currentSession, FACTORY, currentTestId), EN_US, FR_FR);
+                manager.getTm(FACTORY, currentTestId), EN_US, FR_FR);
     }
     
     @Test
     public void testFuzzyMatchingWithMatchLocales() throws Exception {
         testFuzzyMatchingWithMatchLocales(
-                manager.getTm(currentSession, FACTORY, currentTestId), EN_US, FR_FR, DE_DE);
+                manager.getTm(FACTORY, currentTestId), EN_US, FR_FR, DE_DE);
     }
     
     @Test
     public void testTuIdentityWithAttributes() throws Exception {
-        TM3Tm<TestData> tm = manager.getTm(currentSession, FACTORY, currentTestId);
+        TM3Tm<TestData> tm = manager.getTm(FACTORY, currentTestId);
         testTuIdentityWithAttributes(tm, EN_US, FR_FR);
     }
     
     @Test
     public void testModifyTuv() throws Exception {
-        TM3Tm<TestData> tm = manager.getTm(currentSession, FACTORY, currentTestId);
+        TM3Tm<TestData> tm = manager.getTm(FACTORY, currentTestId);
         testModifyTuv(tm, EN_US, FR_FR);
     }
     
     @Test
     public void testAddDeleteTuv() throws Exception {
-        TM3Tm<TestData> tm = manager.getTm(currentSession, FACTORY, currentTestId);
+        TM3Tm<TestData> tm = manager.getTm(FACTORY, currentTestId);
         testAddDeleteTuv(tm, EN_US, FR_FR);
     }
     
     @Test
     public void testUpdateTuAttrs() throws Exception {
-        TM3Tm<TestData> tm = manager.getTm(currentSession, FACTORY, currentTestId);
+        TM3Tm<TestData> tm = manager.getTm(FACTORY, currentTestId);
         testUpdateTuAttrs(tm, EN_US, FR_FR);
     }
     
     @Test
     public void testUpdateSourceTuv() throws Exception {
-        TM3Tm<TestData> tm = manager.getTm(currentSession, FACTORY, currentTestId);
+        TM3Tm<TestData> tm = manager.getTm(FACTORY, currentTestId);
         testUpdateSourceTuv(tm, EN_US, FR_FR);
     }
 
     @Test
     public void testDontReturnRedundantResults() throws Exception {
-        TM3Tm<TestData> tm = manager.getTm(currentSession, FACTORY, currentTestId);
+        TM3Tm<TestData> tm = manager.getTm(FACTORY, currentTestId);
         testDontReturnRedundantResults(tm, EN_US, FR_FR);
     }
     
     @Test
     public void testTuvEvents() throws Exception {
-        TM3Tm<TestData> tm = manager.getTm(currentSession, FACTORY, currentTestId);
+        TM3Tm<TestData> tm = manager.getTm(FACTORY, currentTestId);
         testTuvEvents(tm, EN_US, FR_FR);
     }
     
     @Test
     public void testIdempotentMergeMode() throws Exception {
-        TM3Tm<TestData> tm = manager.getTm(currentSession, FACTORY, currentTestId);
+        TM3Tm<TestData> tm = manager.getTm(FACTORY, currentTestId);
         testIdempotentMergeMode(tm, EN_US, FR_FR);
     }
     
     @Test
     public void testMatchType() throws Exception {
-        TM3Tm<TestData> tm = manager.getTm(currentSession, FACTORY, currentTestId);
+        TM3Tm<TestData> tm = manager.getTm(FACTORY, currentTestId);
         testMatchType(tm, EN_US, FR_FR);
     }
     
     @Test
     public void testFuzzyMatchThreshold() throws Exception {
-        TM3Tm<TestData> tm = manager.getTm(currentSession, FACTORY, currentTestId);
+        TM3Tm<TestData> tm = manager.getTm(FACTORY, currentTestId);
         testFuzzyMatchThresholdAndLimit(tm, EN_US, FR_FR);
     }
     
     @Test
     public void testEmptyFuzzyQuery() throws Exception {
-        TM3Tm<TestData> tm = manager.getTm(currentSession, FACTORY, currentTestId);
+        TM3Tm<TestData> tm = manager.getTm(FACTORY, currentTestId);
         testEmptyFuzzyQuery(tm, EN_US, FR_FR);
     }
     
     @Test
     public void testIdenticalScores() throws Exception {
-        TM3Tm<TestData> tm = manager.getTm(currentSession, FACTORY, currentTestId);
+        TM3Tm<TestData> tm = manager.getTm(FACTORY, currentTestId);
         testIdenticalScores(tm, EN_US, FR_FR);
     }
       
     @Test
     public void testMaxResults() throws Exception {
-        TM3Tm<TestData> tm = manager.getTm(currentSession, FACTORY, currentTestId);
+        TM3Tm<TestData> tm = manager.getTm(FACTORY, currentTestId);
         testMaxResultsFilterOrdering(tm, EN_US, FR_FR);
     }
 
     @Test
     public void testGetAllTuData() throws Exception {
-        TM3Tm<TestData> tm = manager.getTm(currentSession, FACTORY, currentTestId);
+        TM3Tm<TestData> tm = manager.getTm(FACTORY, currentTestId);
         testGetAllTuData(tm, EN_US, FR_FR);
     }
     
     @Test
     public void testGetAllTuDataWithDateRange() throws Exception {
-        TM3Tm<TestData> tm = manager.getTm(currentSession, FACTORY, currentTestId);
+        TM3Tm<TestData> tm = manager.getTm(FACTORY, currentTestId);
         testGetAllTuDataWithDateRange(tm, EN_US, FR_FR);
     }
 
     @Test
     public void testGetTuDataByLocale() throws Exception {
-        TM3Tm<TestData> tm = manager.getTm(currentSession, FACTORY, currentTestId);
+        TM3Tm<TestData> tm = manager.getTm(FACTORY, currentTestId);
         testGetTuDataByLocale(tm, EN_US, FR_FR);
     }
     
     @Test
     public void testGetTuDataByLocaleWithDateRange() throws Exception {
-        TM3Tm<TestData> tm = manager.getTm(currentSession, FACTORY, currentTestId);
+        TM3Tm<TestData> tm = manager.getTm(FACTORY, currentTestId);
         testGetAllTuDataWithDateRange(tm, EN_US, FR_FR);
     }
 
     @Test
     public void testGetTuDataById() throws Exception {
-        TM3Tm<TestData> tm = manager.getTm(currentSession, FACTORY, currentTestId);
+        TM3Tm<TestData> tm = manager.getTm(FACTORY, currentTestId);
         testGetTuDataById(tm, EN_US, FR_FR);
     }
 
     @Test
     public void testLockOnSave() throws Exception {
-        TM3Tm<TestData> tm = manager.getTm(currentSession, FACTORY, currentTestId);
+        TM3Tm<TestData> tm = manager.getTm(FACTORY, currentTestId);
         testLockOnSave(tm, EN_US, FR_FR);
     }
 
     @Test
     public void testLockOnModify() throws Exception {
-        TM3Tm<TestData> tm = manager.getTm(currentSession, FACTORY, currentTestId);
+        TM3Tm<TestData> tm = manager.getTm(FACTORY, currentTestId);
         testLockOnModify(tm, EN_US, FR_FR);
     }
     
     @Test
     public void testMultipleTargets() throws Exception {
-        TM3Tm<TestData> tm = manager.getTm(currentSession, FACTORY, currentTestId);
+        TM3Tm<TestData> tm = manager.getTm(FACTORY, currentTestId);
         testMultipleTargets(tm, EN_US, FR_FR);
     }
     
     @Test
     public void testIdenticalTargets() throws Exception {
-        TM3Tm<TestData> tm = manager.getTm(currentSession, FACTORY, currentTestId);
+        TM3Tm<TestData> tm = manager.getTm(FACTORY, currentTestId);
         testIdenticalTargets(tm, EN_US, FR_FR);
     }
     
     @Test
     public void testMerge() throws Exception {
-        TM3Tm<TestData> tm = manager.getTm(currentSession, FACTORY, currentTestId);
+        TM3Tm<TestData> tm = manager.getTm(FACTORY, currentTestId);
         testMerge(tm, EN_US, FR_FR);
     }
     
     @Test
     public void testMergeIdentical() throws Exception {
-        TM3Tm<TestData> tm = manager.getTm(currentSession, FACTORY, currentTestId);
+        TM3Tm<TestData> tm = manager.getTm(FACTORY, currentTestId);
         testMergeIdentical(tm, EN_US, FR_FR);
     }
     
     @Test
     public void testMergeWithIdenticalTargets() throws Exception {
-        TM3Tm<TestData> tm = manager.getTm(currentSession, FACTORY, currentTestId);
+        TM3Tm<TestData> tm = manager.getTm(FACTORY, currentTestId);
         testMergeWithIdenticalTargets(tm, EN_US, FR_FR);
     }
     
     @Test
     public void testOverwrite() throws Exception {
-        TM3Tm<TestData> tm = manager.getTm(currentSession, FACTORY, currentTestId);
+        TM3Tm<TestData> tm = manager.getTm(FACTORY, currentTestId);
         testOverwrite(tm, EN_US, FR_FR);
     }
     
     @Test
     public void testOverwriteOfMultipleTargets() throws Exception {
-        TM3Tm<TestData> tm = manager.getTm(currentSession, FACTORY, currentTestId);
+        TM3Tm<TestData> tm = manager.getTm(FACTORY, currentTestId);
         testOverwriteOfMultipleTargets(tm, EN_US, FR_FR);
     }
     
     @Test
     public void testOverwriteOfMultipleTargetsWithIdentical() throws Exception {
-        TM3Tm<TestData> tm = manager.getTm(currentSession, FACTORY, currentTestId);
+        TM3Tm<TestData> tm = manager.getTm(FACTORY, currentTestId);
         testOverwriteOfMultipleTargetsWithIdentical(tm, EN_US, FR_FR);
     }
     
     @Test
     public void testOverwriteWithMultipleTargets() throws Exception {
-        TM3Tm<TestData> tm = manager.getTm(currentSession, FACTORY, currentTestId);
+        TM3Tm<TestData> tm = manager.getTm(FACTORY, currentTestId);
         testOverwriteWithMultipleTargets(tm, EN_US, FR_FR);
     }
     
     @Test
     public void testOverwriteWithIdenticalTargets() throws Exception {
-        TM3Tm<TestData> tm = manager.getTm(currentSession, FACTORY, currentTestId);
+        TM3Tm<TestData> tm = manager.getTm(FACTORY, currentTestId);
         testOverwriteWithIdenticalTargets(tm, EN_US, FR_FR);
     }
   
@@ -647,19 +653,19 @@ public abstract class TM3Tests {
     @Test
     public void testDataByLocaleOrderingFlushTus() throws Exception {
         testDataByLocaleOrderingFlushTus(
-                manager.getTm(currentSession, FACTORY, currentTestId), EN_US, FR_FR, DE_DE);
+                manager.getTm(FACTORY, currentTestId), EN_US, FR_FR, DE_DE);
     }
 
     @Test
     public void testDataByLocaleOrderingSaveMultiple() throws Exception {
         testDataByLocaleOrderingSaveMultiple(
-                manager.getTm(currentSession, FACTORY, currentTestId), EN_US, FR_FR, DE_DE);
+                manager.getTm(FACTORY, currentTestId), EN_US, FR_FR, DE_DE);
     }
     
     @Test
     public void testFuzzyLookupKeyLocaleAndLookupTarget() throws Exception {
         testFuzzyLookupKeyLocaleAndLookupTarget(
-                manager.getTm(currentSession, FACTORY, currentTestId), EN_US, FR_FR);
+                manager.getTm(FACTORY, currentTestId), EN_US, FR_FR);
     }
     
     // 
@@ -2282,7 +2288,8 @@ public abstract class TM3Tests {
             }
             @Override
             public void test(Session session, Transaction currentTransaction) throws Exception {
-                TM3Tm<TestData> tm = manager.getTm(session, FACTORY, testTm.getId());
+                TM3Manager testManager = DefaultManager.create(session);
+                TM3Tm<TestData> tm = testManager.getTm(FACTORY, testTm.getId());
                 tm.createSaver()
                   .tu(new TestData("src1"), srcLocale, event)
                   .attr(attr, "value")
@@ -2342,7 +2349,8 @@ public abstract class TM3Tests {
             }
             @Override
             public void test(Session session, Transaction tx) throws Exception {
-                TM3Tm<TestData> tm = manager.getTm(session, FACTORY, testTm.getId());
+                TM3Manager testManager = DefaultManager.create(session);
+                TM3Tm<TestData> tm = testManager.getTm(FACTORY, testTm.getId());
                 tm.createSaver()
                   .tu(srcData, srcLocale, event)
                   .target(newTgtData, tgtLocale, event)
@@ -2359,7 +2367,8 @@ public abstract class TM3Tests {
             }
             @Override
             public void test(Session session, Transaction tx) throws Exception {
-                TM3Tm<TestData> tm = manager.getTm(session, FACTORY, testTm.getId());
+                TM3Manager testManager = DefaultManager.create(session);
+                TM3Tm<TestData> tm = testManager.getTm(FACTORY, testTm.getId());
                 TM3LeverageResults<TestData> results = tm.findMatches(srcData,
                         srcLocale, Collections.singleton(tgtLocale), 
                         TM3Attributes.NONE, TM3MatchType.EXACT, false);
@@ -2858,7 +2867,7 @@ public abstract class TM3Tests {
     public void testFixedFingerprintTuvs(TestLocale srcLocale, 
             final TestLocale tgtLocale) throws Exception {
         FixedValueTestDataFactory factory = new FixedValueTestDataFactory(2L);
-        TM3Tm<TestData> tm = manager.getTm(currentSession, factory, currentTestId);
+        TM3Tm<TestData> tm = manager.getTm(factory, currentTestId);
         try {
             currentTransaction = currentSession.beginTransaction();
             // Now let's create some segments.

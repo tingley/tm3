@@ -22,28 +22,24 @@ public class TestMultilingualSharedTm extends TM3Tests {
     public static void setup() throws Exception {
         init();
         currentSession = sessionFactory.openSession();
-        currentSession.doWork(new Work() {
-            @Override
-            public void execute(Connection conn) throws SQLException {
-                // Tear down storage pool from old test
-                manager.removeStoragePool(conn, SHARED_STORAGE_ID);
-                // Recreate it
-                manager.createStoragePool(conn, SHARED_STORAGE_ID, inlineAttrs());
-            }
-        });
+        TM3Manager<?> mgr = DefaultManager.create(currentSession);
+        mgr.removeStoragePool(SHARED_STORAGE_ID);
+        // Recreate it
+        mgr.createStoragePool(SHARED_STORAGE_ID, inlineAttrs());
         currentSession.close();
     }
     
     // Set up a bilingual TM for each test, start a fresh hibernate session, etc
     @Before
+    @Override
     public void beforeTest() throws Exception {
-        currentSession = sessionFactory.openSession();
+        super.beforeTest();
         Transaction tx = null;
         try {
             tx = currentSession.beginTransaction();
             System.out.println("Creating TM id " + currentTestId);
             TM3Tm<TestData> tm = manager.createMultilingualSharedTm(
-                    currentSession, FACTORY, inlineAttrs(), SHARED_STORAGE_ID);
+                    FACTORY, inlineAttrs(), SHARED_STORAGE_ID);
             currentSession.flush();
             currentTestId = tm.getId();
             currentTestEvent = tm.addEvent(0, "test", "test " + currentTestId);
@@ -64,13 +60,13 @@ public class TestMultilingualSharedTm extends TM3Tests {
     public void testCreateMultilingualSharedTm() throws Exception {
         Transaction tx = null;
         try {
-            TM3Tm<TestData> tm2 = manager.getTm(currentSession, FACTORY, currentTestId);
+            TM3Tm<TestData> tm2 = manager.getTm(FACTORY, currentTestId);
             assertNotNull(tm2);
             assertTrue(tm2 instanceof MultilingualSharedTm);
             
             cleanupTestDb(manager);
             
-            TM3Tm<TestData> tm3 = manager.getTm(currentSession, FACTORY, currentTestId);
+            TM3Tm<TestData> tm3 = manager.getTm(FACTORY, currentTestId);
             assertNull(tm3);
         }
         catch (Exception e) {

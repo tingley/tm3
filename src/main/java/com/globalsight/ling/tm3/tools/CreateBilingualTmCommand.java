@@ -80,7 +80,7 @@ class CreateBilingualTmCommand extends CreateTmCommand {
         }
         
         return getManager().createBilingualTm(
-                session, null, Collections.EMPTY_SET,
+                null, Collections.EMPTY_SET,
                 srcLocale, tgtLocale);
     }
     

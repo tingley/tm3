@@ -14,7 +14,7 @@ public class CreateMultilingualTmCommand extends CreateTmCommand {
     protected TM3Tm<?> createTm(Session session, CommandLine command)
             throws Exception {
         return getManager().createMultilingualTm(
-                session, null, Collections.EMPTY_SET);
+                null, Collections.EMPTY_SET);
     }
 
     @Override
