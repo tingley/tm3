@@ -6,6 +6,8 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 
+import org.hibernate.Session;
+
 import com.globalsight.ling.tm3.core.TM3Exception;
 import com.globalsight.ling.tm3.core.persistence.StatementBuilder;
 
@@ -30,9 +32,9 @@ public class DistributedId {
         this.increment = increment;
     }
 
-    public long getId(Connection conn) throws SQLException {
+    public long getId(Session session) throws SQLException {
         if (nextId >= max) {
-            nextId = reserveId(conn, increment);
+            nextId = reserveId(session, increment);
             max = nextId + increment;
         }
         return nextId++;
@@ -51,17 +53,17 @@ public class DistributedId {
      * @return
      * @throws SQLException
      */
-    private long reserveId(Connection conn, int count) throws SQLException {
+    private long reserveId(Session session, int count) throws SQLException {
         // The magic to why this query works is the use of LAST_INSERT_ID(expr), which
         // will set the scoped LAST_INSERT_ID value to be the value of 'expr', 
         // prior to updating it. 
-        SQLUtil.exec(conn, new StatementBuilder()
+        SQLUtil.exec(session, new StatementBuilder()
             .append("INSERT INTO TM3_ID (tableName, nextId) VALUES (?, LAST_INSERT_ID(1)+?)")
             .addValues(tableName, count)
             .append(" ON DUPLICATE KEY UPDATE nextId=LAST_INSERT_ID(nextId)+?")
             .addValue(count)
         );
         
-        return SQLUtil.getLastInsertId(conn);
+        return SQLUtil.getLastInsertId(session);
     }
 }

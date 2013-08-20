@@ -47,17 +47,13 @@ public class TestMultilingualTm extends TM3Tests {
     public void testCreateMultilingualTm() throws Exception {
         Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();            
             TM3Tm<TestData> tm2 = manager.getTm(currentSession, FACTORY, currentTestId);
             assertNotNull(tm2);
             assertTrue(tm2 instanceof MultilingualTm);
-            
             cleanupTestDb(manager);
             
-            tx = currentSession.beginTransaction();
             TM3Tm<TestData> tm3 = manager.getTm(currentSession, FACTORY, currentTestId);
             assertNull(tm3);
-            tx.commit();
         }
         catch (Exception e) {
             tx.rollback();

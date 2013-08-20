@@ -206,7 +206,7 @@
     <dependency>
         <groupId>org.hibernate</groupId>
         <artifactId>hibernate-core</artifactId>
-        <version>3.3.2.GA</version>
+        <version>4.1.9.Final</version>
     </dependency>
     <dependency>
         <groupId>org.slf4j</groupId>
@@ -218,10 +218,12 @@
         <artifactId>mysql-connector-java</artifactId>
         <version>5.1.20</version>
     </dependency>
+    <!--
     <dependency>
         <groupId>javassist</groupId>
         <artifactId>javassist</artifactId>
         <version>3.12.1.GA</version>
     </dependency>
+    -->
   </dependencies>
 </project>

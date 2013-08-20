@@ -17,6 +17,8 @@ import java.util.Map;
 import java.util.Set;
 
 import org.hibernate.Session;
+import org.hibernate.jdbc.ReturningWork;
+import org.hibernate.jdbc.Work;
 
 import com.globalsight.ling.tm3.core.persistence.BatchStatementBuilder;
 import com.globalsight.ling.tm3.core.persistence.SQLUtil;
@@ -46,8 +48,8 @@ abstract class TuStorage<T extends TM3Data> {
         return storage;
     }
     
-    protected Connection getConnection() {
-        return storage.getSession().connection();
+    protected Session getSession() {
+        return storage.getSession();
     }
 
     /**
@@ -56,7 +58,7 @@ abstract class TuStorage<T extends TM3Data> {
      * @param tu
      * @throws SQLException 
      */
-    public abstract void saveTu(Connection conn, TM3Tu<T> tu)
+    public abstract void saveTu(Session session, TM3Tu<T> tu)
                         throws SQLException;
     
     /**
@@ -67,7 +69,7 @@ abstract class TuStorage<T extends TM3Data> {
      */
     public void deleteTu(TM3Tu<T> tu) throws SQLException {
         // TUV, Events, and AttrVals should both cascade.
-        SQLUtil.exec(getConnection(), new StatementBuilder()
+        SQLUtil.exec(getSession(), new StatementBuilder()
             .append("DELETE FROM ")
             .append(storage.getTuTableName())
             .append(" WHERE id = ?").addValue(tu.getId()));
@@ -83,7 +85,7 @@ abstract class TuStorage<T extends TM3Data> {
         if (ids.size() == 0) {
             return;
         }
-        SQLUtil.exec(getConnection(), new StatementBuilder()
+        SQLUtil.exec(getSession(), new StatementBuilder()
             .append("DELETE FROM ")
             .append(storage.getTuTableName())
             .append(" WHERE id IN ")
@@ -115,39 +117,45 @@ abstract class TuStorage<T extends TM3Data> {
             sb.append(",?").addValue(tuvs.get(i).getId());
         }
         sb.append(")");
-        SQLUtil.exec(getConnection(), sb);
+        SQLUtil.exec(getSession(), sb);
     }
        
     public abstract void addTuvs(TM3Tu<T> tu, List<TM3Tuv<T>> tuvs) 
                             throws SQLException;
     
     List<FuzzyCandidate<T>> loadFuzzyCandidates(List<Long> tuvIds,
-            TM3Locale keyLocale) throws SQLException {
+            final TM3Locale keyLocale) throws SQLException {
         if (tuvIds.size() == 0) {
             return Collections.emptyList();
         }
-        StringBuilder sb = new StringBuilder();
+        final StringBuilder sb = new StringBuilder();
         sb.append("SELECT ")
           .append("id, tuId, fingerprint, content")
           .append(" FROM ")
           .append(getStorage().getTuvTableName())
           .append(" WHERE id IN")
           .append(SQLUtil.longGroup(tuvIds));
-        Statement s = getConnection().createStatement();
-        ResultSet rs = SQLUtil.execQuery(s, sb.toString()); 
+        return getSession().doReturningWork(new ReturningWork<List<FuzzyCandidate<T>>>() {
+            @Override
+            public List<FuzzyCandidate<T>> execute(Connection conn)
+                    throws SQLException {
+                Statement s = conn.createStatement();
+                ResultSet rs = SQLUtil.execQuery(s, sb.toString()); 
 
-        List<FuzzyCandidate<T>> fuzzies = new ArrayList<FuzzyCandidate<T>>();
-        while (rs.next()) {
-            long id = rs.getLong(1);
-            long tuId = rs.getLong(2);
-            long fingerprint = rs.getLong(3);
-            String content = rs.getString(4);
-            TM3DataFactory<T> factory = getStorage().getTm().getDataFactory();
-            fuzzies.add(new FuzzyCandidate<T>(id, tuId, fingerprint,
-                    factory.fromSerializedForm(keyLocale, content)));
-        }
-        s.close();
-        return fuzzies;
+                List<FuzzyCandidate<T>> fuzzies = new ArrayList<FuzzyCandidate<T>>();
+                while (rs.next()) {
+                    long id = rs.getLong(1);
+                    long tuId = rs.getLong(2);
+                    long fingerprint = rs.getLong(3);
+                    String content = rs.getString(4);
+                    TM3DataFactory<T> factory = getStorage().getTm().getDataFactory();
+                    fuzzies.add(new FuzzyCandidate<T>(id, tuId, fingerprint,
+                            factory.fromSerializedForm(keyLocale, content)));
+                }
+                s.close();
+                return fuzzies;
+            }
+        });
     }    
 
     public abstract void updateTuvs(TM3Tu<T> tu, List<TM3Tuv<T>> tuvs,
@@ -182,7 +190,7 @@ abstract class TuStorage<T extends TM3Data> {
             Map<TM3Attribute, String> attributes) throws SQLException;
 
     void deleteCustomAttributes(long tuId) throws SQLException {
-        SQLUtil.exec(getConnection(), new StatementBuilder("DELETE FROM ")
+        SQLUtil.exec(getSession(), new StatementBuilder("DELETE FROM ")
                 .append(storage.getAttrValTableName())
                 .append(" WHERE tuId = ?").addValue(tuId));
     }
@@ -335,7 +343,7 @@ OUTER:  for (FuzzyCandidate<T> candidate : candidates) {
         }
     }
         
-    public List<TM3Tuv<T>> getExactMatches(Connection conn, T key, 
+    public List<TM3Tuv<T>> getExactMatches(Session session, T key, 
            TM3Locale keyLocale, Set<? extends TM3Locale> matchLocales,
            Map<TM3Attribute, Object> inlineAttributes,
            Map<TM3Attribute, String> customAttributes,
@@ -355,15 +363,21 @@ OUTER:  for (FuzzyCandidate<T> candidate : candidates) {
                 sb.append(" FOR UPDATE");
             }
         }
-        PreparedStatement ps = sb.toPreparedStatement(conn);
-        ResultSet rs = SQLUtil.execQuery(ps);
-        Set<Long> tuvIds = new HashSet<Long>();
-        List<Long> tuIds = new ArrayList<Long>();
-        while (rs.next()) {
-            tuvIds.add(rs.getLong(1));
-            tuIds.add(rs.getLong(2));
-        }
-        ps.close();
+        final Set<Long> tuvIds = new HashSet<Long>();
+        final List<Long> tuIds = new ArrayList<Long>();
+        final StatementBuilder finalSb = sb;
+        getSession().doWork(new Work() {
+            @Override
+            public void execute(Connection conn) throws SQLException {
+                PreparedStatement ps = finalSb.toPreparedStatement(conn);
+                ResultSet rs = SQLUtil.execQuery(ps);
+                while (rs.next()) {
+                    tuvIds.add(rs.getLong(1));
+                    tuIds.add(rs.getLong(2));
+                }
+                ps.close();
+            }
+        });
 
         // XXX Could save a query by having the lookup fetch the TU row, or even
         // the TU row + TUV source row (and lazily load rest...)

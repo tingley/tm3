@@ -30,7 +30,7 @@ class MultilingualFuzzyIndex<T extends TM3Data> extends FuzzyIndex<T> {
             sb.addBatch(fp, tuv.getId(), tuv.getTu().getId(), 
                         tuv.getLocale().getId(), tuvCount, tuv.isSource());
         }
-        SQLUtil.execBatch(getConnection(), sb);
+        SQLUtil.execBatch(getSession(), sb);
     }
 
     @Override
@@ -40,7 +40,7 @@ class MultilingualFuzzyIndex<T extends TM3Data> extends FuzzyIndex<T> {
           .append(getStorage().getFuzzyIndexTableName())
           .append(" WHERE tuvId = ?")
           .addValues(tuv.getId());
-        SQLUtil.exec(getConnection(), sb);
+        SQLUtil.exec(getSession(), sb);
     }
 
 

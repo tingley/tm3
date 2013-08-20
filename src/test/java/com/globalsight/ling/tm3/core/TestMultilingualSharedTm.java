@@ -5,7 +5,10 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.sql.Connection;
+import java.sql.SQLException;
+
 import org.hibernate.Transaction;
+import org.hibernate.jdbc.Work;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -19,11 +22,15 @@ public class TestMultilingualSharedTm extends TM3Tests {
     public static void setup() throws Exception {
         init();
         currentSession = sessionFactory.openSession();
-        Connection conn = currentSession.connection();
-        // Tear down storage pool from old test
-        manager.removeStoragePool(conn, SHARED_STORAGE_ID);
-        // Recreate it
-        manager.createStoragePool(conn, SHARED_STORAGE_ID, inlineAttrs());
+        currentSession.doWork(new Work() {
+            @Override
+            public void execute(Connection conn) throws SQLException {
+                // Tear down storage pool from old test
+                manager.removeStoragePool(conn, SHARED_STORAGE_ID);
+                // Recreate it
+                manager.createStoragePool(conn, SHARED_STORAGE_ID, inlineAttrs());
+            }
+        });
         currentSession.close();
     }
     
@@ -57,17 +64,14 @@ public class TestMultilingualSharedTm extends TM3Tests {
     public void testCreateMultilingualSharedTm() throws Exception {
         Transaction tx = null;
         try {
-            tx = currentSession.beginTransaction();            
             TM3Tm<TestData> tm2 = manager.getTm(currentSession, FACTORY, currentTestId);
             assertNotNull(tm2);
             assertTrue(tm2 instanceof MultilingualSharedTm);
             
             cleanupTestDb(manager);
             
-            tx = currentSession.beginTransaction();
             TM3Tm<TestData> tm3 = manager.getTm(currentSession, FACTORY, currentTestId);
             assertNull(tm3);
-            tx.commit();
         }
         catch (Exception e) {
             tx.rollback();

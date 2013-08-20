@@ -7,6 +7,7 @@ import java.util.HashSet;
 import java.util.Map;
 
 import org.hibernate.Session;
+import org.hibernate.jdbc.Work;
 
 import com.globalsight.ling.tm3.core.persistence.DistributedId;
 import com.globalsight.ling.tm3.core.persistence.StatementBuilder;
@@ -97,14 +98,17 @@ abstract class StorageInfo<T extends TM3Data> {
         // Initialize table names
         initializeTm();
         
-        Connection conn = session.connection();
-        
-        // Create TU and TUV storage
-        createTuStorage(conn);
-        // Create Fuzzy Index
-        createFuzzyIndex(conn);
-        // Other tables
-        createAttrTable(conn);
+        session.doWork(new Work() {
+            @Override
+            public void execute(Connection conn) throws SQLException {
+                // Create TU and TUV storage
+                createTuStorage(conn);
+                // Create Fuzzy Index
+                createFuzzyIndex(conn);
+                // Other tables
+                createAttrTable(conn);
+            }
+        });
     }
     
     /**
@@ -114,11 +118,14 @@ abstract class StorageInfo<T extends TM3Data> {
      * @throws SQLException
      */
     public void destroy() throws SQLException {
-        Connection conn = session.connection();
-        
-        destroyAttrTable(conn);
-        destroyFuzzyIndex(conn);
-        destroyTuStorage(conn);
+        session.doWork(new Work() {
+            @Override
+            public void execute(Connection conn) throws SQLException {
+                destroyAttrTable(conn);
+                destroyFuzzyIndex(conn);
+                destroyTuStorage(conn);
+            }
+        });
     }
 
     /**
@@ -144,12 +151,12 @@ abstract class StorageInfo<T extends TM3Data> {
     }
 
     // XXX Should this use its own connection?
-    long getTuId(Connection conn) throws SQLException {
-        return getTuIds().getId(conn);
+    long getTuId(Session session) throws SQLException {
+        return getTuIds().getId(session);
     }
     
-    long getTuvId(Connection conn) throws SQLException {
-        return getTuvIds().getId(conn);
+    long getTuvId(Session session) throws SQLException {
+        return getTuvIds().getId(session);
     }
     
     /**

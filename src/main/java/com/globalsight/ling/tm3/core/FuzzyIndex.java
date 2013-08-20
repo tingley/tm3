@@ -11,6 +11,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.HashSet;
 
+import org.hibernate.Session;
+import org.hibernate.jdbc.ReturningWork;
+
 import com.globalsight.ling.tm3.core.persistence.SQLUtil;
 import com.globalsight.ling.tm3.core.persistence.StatementBuilder;
 
@@ -25,8 +28,8 @@ abstract class FuzzyIndex<T extends TM3Data> {
         return storage;
     }
     
-    protected Connection getConnection() {
-        return storage.getSession().connection();
+    protected Session getSession() {
+        return storage.getSession();
     }
     
     /**
@@ -98,17 +101,23 @@ abstract class FuzzyIndex<T extends TM3Data> {
         if (customAttributes.size() > 0) {
             sb = getAttributeMatchWrapper(sb, customAttributes);
         }
-        sb = addLimit(sb, maxResults);
-        PreparedStatement ps = sb.toPreparedStatement(getConnection());
-        ResultSet rs = SQLUtil.execQuery(ps); 
-        List<Long> ids = new ArrayList<Long>();
-        while (rs.next()) {
-            long tuvId = rs.getLong(1);
-            long tuId = rs.getLong(2); // Currently unused!
-            int score = rs.getInt(3); // Currently unused!
-            ids.add(tuvId);
-        }
-        ps.close();
+        final StatementBuilder finalSb = addLimit(sb, maxResults);
+        List<Long> ids = getSession().doReturningWork(new ReturningWork<List<Long>>() {
+            @Override
+            public List<Long> execute(Connection conn) throws SQLException {
+                PreparedStatement ps = finalSb.toPreparedStatement(conn);
+                ResultSet rs = SQLUtil.execQuery(ps); 
+                List<Long> ids = new ArrayList<Long>();
+                while (rs.next()) {
+                    long tuvId = rs.getLong(1);
+                    long tuId = rs.getLong(2); // Currently unused!
+                    int score = rs.getInt(3); // Currently unused!
+                    ids.add(tuvId);
+                }
+                ps.close();
+                return ids;
+            }
+        });
         return getStorage().getTuStorage().loadFuzzyCandidates(ids, keyLocale);
     }
     

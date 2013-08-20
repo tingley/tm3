@@ -15,6 +15,8 @@ import java.util.HashMap;
 import java.util.Set;
 
 import org.hibernate.Session;
+import org.hibernate.jdbc.ReturningWork;
+import org.hibernate.jdbc.Work;
 
 import com.globalsight.ling.tm3.core.TuStorage.TuData;
 import com.globalsight.ling.tm3.core.TuStorage.TuvData;
@@ -35,8 +37,8 @@ class DedicatedTuStorage<T extends TM3Data>  extends TuStorage<T> {
      * @throws SQLException 
      */
     @Override
-    public void saveTu(Connection conn, TM3Tu<T> tu) throws SQLException {
-        tu.setId(getStorage().getTuId(conn));
+    public void saveTu(Session session, TM3Tu<T> tu) throws SQLException {
+        tu.setId(getStorage().getTuId(session));
         Map<TM3Attribute, Object> inlineAttributes =
             BaseTm.getInlineAttributes(tu.getAttributes());
         Map<TM3Attribute, String> customAttributes =
@@ -53,7 +55,7 @@ class DedicatedTuStorage<T extends TM3Data>  extends TuStorage<T> {
             sb.append(", ?").addValue(e.getValue());
         }
         sb.append(")");
-        SQLUtil.exec(getConnection(), sb);
+        SQLUtil.exec(session, sb);
         addTuvs(tu, tu.getAllTuv());
         saveCustomAttributes(tu.getId(), customAttributes);
     }
@@ -64,9 +66,8 @@ class DedicatedTuStorage<T extends TM3Data>  extends TuStorage<T> {
         if (tuvs.size() == 0) {
             return;
         }
-        Connection conn = getConnection();
         for (TM3Tuv<T> tuv : tuvs) {
-            tuv.setId(getStorage().getTuvId(conn));
+            tuv.setId(getStorage().getTuvId(getSession()));
         }
         BatchStatementBuilder sb = new BatchStatementBuilder("INSERT INTO ")
             .append(getStorage().getTuvTableName())
@@ -78,7 +79,7 @@ class DedicatedTuStorage<T extends TM3Data>  extends TuStorage<T> {
                         tuv.getFirstEvent().getId(),
                         tuv.getLatestEvent().getId());
         }
-        SQLUtil.execBatch(conn, sb);
+        SQLUtil.execBatch(getSession(), sb);
     }
 
     @Override
@@ -94,7 +95,7 @@ class DedicatedTuStorage<T extends TM3Data>  extends TuStorage<T> {
             sb.addBatch(tuv.getSerializedForm(), tuv.getFingerprint(), 
                         event.getId(), tuv.getId());
         }
-        SQLUtil.execBatch(getConnection(), sb);
+        SQLUtil.execBatch(getSession(), sb);
     }
     
     /**
@@ -122,7 +123,7 @@ class DedicatedTuStorage<T extends TM3Data>  extends TuStorage<T> {
               .addValue(e.getValue());
         }
         sb.append(" WHERE id = ?").addValue(tuId);
-        SQLUtil.exec(getConnection(), sb);
+        SQLUtil.exec(getSession(), sb);
     }
 
     /**
@@ -143,13 +144,13 @@ class DedicatedTuStorage<T extends TM3Data>  extends TuStorage<T> {
         for (Map.Entry<TM3Attribute, String> e : attributes.entrySet()) {
             sb.addBatch(tuId, e.getKey().getId(), e.getValue());
         }
-        SQLUtil.execBatch(getConnection(), sb);
+        SQLUtil.execBatch(getSession(), sb);
     }
 
     @Override
     protected List<TuData<T>> getTuData(List<Long> ids, boolean locking) 
                                 throws SQLException {
-        StringBuilder sb = new StringBuilder();
+        final StringBuilder sb = new StringBuilder();
         sb.append("SELECT ")
           .append("id, srcLocaleId");
         for (TM3Attribute attr : getStorage().getInlineAttributes()) {
@@ -164,31 +165,35 @@ class DedicatedTuStorage<T extends TM3Data>  extends TuStorage<T> {
             sb.append(" FOR UPDATE");
         }
         
-        Connection conn = getConnection(); 
-        Statement s = conn.createStatement();
-        ResultSet rs = SQLUtil.execQuery(s, sb.toString());
-        
-        List<TuData<T>> tuDatas = new ArrayList<TuData<T>>(); 
-        while (rs.next()) {
-            TuData<T> tu = new TuData<T>();
-            tu.id = rs.getLong(1);
-            tu.srcLocaleId = rs.getLong(2);
-            int pos = 3;
-            for (TM3Attribute attr : getStorage().getInlineAttributes()) {
-                Object val = rs.getObject(pos++);
-                if (val != null) {
-                    tu.attrs.put(attr, val);
+        return getSession().doReturningWork(new ReturningWork<List<TuData<T>>>() {
+            @Override
+            public List<com.globalsight.ling.tm3.core.TuStorage.TuData<T>> execute(
+                    Connection conn) throws SQLException {
+                Statement s = conn.createStatement();
+                ResultSet rs = SQLUtil.execQuery(s, sb.toString());
+                
+                List<TuData<T>> tuDatas = new ArrayList<TuData<T>>(); 
+                while (rs.next()) {
+                    TuData<T> tu = new TuData<T>();
+                    tu.id = rs.getLong(1);
+                    tu.srcLocaleId = rs.getLong(2);
+                    int pos = 3;
+                    for (TM3Attribute attr : getStorage().getInlineAttributes()) {
+                        Object val = rs.getObject(pos++);
+                        if (val != null) {
+                            tu.attrs.put(attr, val);
+                        }
+                    }
+                    tuDatas.add(tu);
                 }
-            }
-            tuDatas.add(tu);
-        }
-        s.close();
-        return tuDatas;
+                s.close();
+                return tuDatas;            }
+        });
     }
 
     @Override
     protected long getTuIdByTuvId(Long tuvId) throws SQLException {
-        return SQLUtil.execCountQuery(getConnection(), 
+        return SQLUtil.execCountQuery(getSession(), 
                 new StatementBuilder("SELECT tuId FROM ")
                     .append(getStorage().getTuvTableName())
                     .append(" WHERE id = ?").addValue(tuvId)
@@ -198,7 +203,7 @@ class DedicatedTuStorage<T extends TM3Data>  extends TuStorage<T> {
     @Override
     protected void loadTuvs(List<Long> tuIds, List<TuData<T>> data,
             boolean locking) throws SQLException {
-        StringBuilder sb = new StringBuilder();
+        final StringBuilder sb = new StringBuilder();
         sb.append("SELECT ")
           .append("tuId, id, localeId, fingerprint, content, firstEventId, lastEventId")
           .append(" FROM ")
@@ -209,25 +214,31 @@ class DedicatedTuStorage<T extends TM3Data>  extends TuStorage<T> {
         if (locking) {
             sb.append(" FOR UPDATE");
         }
-        Statement s = getConnection().createStatement();
-        ResultSet rs = SQLUtil.execQuery(s, sb.toString()); 
+        List<TuvData<T>> rawTuvs = getSession().doReturningWork(new ReturningWork<List<TuvData<T>>>() {
+            @Override
+            public List<TuvData<T>> execute(Connection conn) throws SQLException {
+                Statement s = conn.createStatement();
+                ResultSet rs = SQLUtil.execQuery(s, sb.toString()); 
 
-        // In order to avoid a hidden ResultSet in the data factory
-        // invalidating our current one, we must defer looking up
-        // the locales until after we've read all of the data.
-        List<TuvData<T>> rawTuvs = new ArrayList<TuvData<T>>();
-        while (rs.next()) {
-            rawTuvs.add(new TuvData<T>(
-                rs.getLong(1),
-                rs.getLong(2),
-                rs.getLong(3),
-                rs.getLong(4),
-                rs.getString(5),
-                rs.getLong(6),
-                rs.getLong(7)
-            ));
-        }
-        s.close();
+                // In order to avoid a hidden ResultSet in the data factory
+                // invalidating our current one, we must defer looking up
+                // the locales until after we've read all of the data.
+                List<TuvData<T>> rawTuvs = new ArrayList<TuvData<T>>();
+                while (rs.next()) {
+                    rawTuvs.add(new TuvData<T>(
+                        rs.getLong(1),
+                        rs.getLong(2),
+                        rs.getLong(3),
+                        rs.getLong(4),
+                        rs.getString(5),
+                        rs.getLong(6),
+                        rs.getLong(7)
+                    ));
+                }
+                s.close();
+                return rawTuvs;
+            }
+        });
         
         Iterator<TuData<T>> tus = data.iterator();
         TuData<T> current = null;
@@ -249,9 +260,9 @@ class DedicatedTuStorage<T extends TM3Data>  extends TuStorage<T> {
     }
 
     @Override
-    protected void loadAttrs(List<Long> tuIds, List<TuData<T>> data,
+    protected void loadAttrs(List<Long> tuIds, final List<TuData<T>> data,
                 boolean locking) throws SQLException {
-        StatementBuilder sb = new StatementBuilder();
+        final StatementBuilder sb = new StatementBuilder();
         sb.append("SELECT tuId, attrId, value FROM ")
           .append(getStorage().getAttrValTableName())
           .append(" WHERE tuid IN (?").addValue(tuIds.get(0));
@@ -262,22 +273,27 @@ class DedicatedTuStorage<T extends TM3Data>  extends TuStorage<T> {
         if (locking) {
             sb.append(" FOR UPDATE");
         }
-        PreparedStatement ps = sb.toPreparedStatement(getConnection());
-        ResultSet rs = SQLUtil.execQuery(ps);
+        getSession().doWork(new Work() {
+            @Override
+            public void execute(Connection conn) throws SQLException {
+                PreparedStatement ps = sb.toPreparedStatement(conn);
+                ResultSet rs = SQLUtil.execQuery(ps);
 
-        Iterator<TuData<T>> tus = data.iterator();
-        TuData<T> current = null;
-        Session session = getStorage().getTm().getSession();
-        while (rs.next()) {
-            long tuId = rs.getLong(1);
-            current = advanceToTu(current, tus, tuId);
-            if (current == null) {
-                throw new IllegalStateException("Couldn't find tuId for " + tuId);
+                Iterator<TuData<T>> tus = data.iterator();
+                TuData<T> current = null;
+                Session session = getStorage().getTm().getSession();
+                while (rs.next()) {
+                    long tuId = rs.getLong(1);
+                    current = advanceToTu(current, tus, tuId);
+                    if (current == null) {
+                        throw new IllegalStateException("Couldn't find tuId for " + tuId);
+                    }
+                    current.attrs.put(getAttributeById(session, rs.getLong(2)), 
+                                      rs.getString(3));
+                }
+                ps.close();            
             }
-            current.attrs.put(getAttributeById(session, rs.getLong(2)), 
-                              rs.getString(3));
-        }
-        ps.close();
+        });
     }
     
     @Override
@@ -371,7 +387,7 @@ class DedicatedTuStorage<T extends TM3Data>  extends TuStorage<T> {
             sb.append("SELECT COUNT(id) FROM ")
               .append(getStorage().getTuTableName());
         }
-        return SQLUtil.execCountQuery(getConnection(), sb);
+        return SQLUtil.execCountQuery(getSession(), sb);
     }
     
     @Override
@@ -390,7 +406,7 @@ class DedicatedTuStorage<T extends TM3Data>  extends TuStorage<T> {
             sb.append("SELECT COUNT(id) FROM ")
               .append(getStorage().getTuvTableName());
         }
-        return SQLUtil.execCountQuery(getConnection(), sb);
+        return SQLUtil.execCountQuery(getSession(), sb);
     }
     
     @Override
@@ -410,7 +426,7 @@ class DedicatedTuStorage<T extends TM3Data>  extends TuStorage<T> {
             sb.append("DELETE FROM ")
               .append(getStorage().getTuTableName());
         }
-        SQLUtil.exec(getConnection(), sb);
+        SQLUtil.exec(getSession(), sb);
     }
 
     @Override
@@ -432,7 +448,7 @@ class DedicatedTuStorage<T extends TM3Data>  extends TuStorage<T> {
               .append(getStorage().getTuvTableName())
               .append(" WHERE localeId = ?").addValue(locale.getId());
         }
-        return SQLUtil.execCountQuery(getConnection(), sb);
+        return SQLUtil.execCountQuery(getSession(), sb);
     }
 
     @Override
@@ -453,7 +469,7 @@ class DedicatedTuStorage<T extends TM3Data>  extends TuStorage<T> {
               .append(getStorage().getTuvTableName())
               .append(" WHERE localeId = ?").addValue(locale.getId());
         }
-        return SQLUtil.execCountQuery(getConnection(), sb);
+        return SQLUtil.execCountQuery(getSession(), sb);
     }
         
     @Override
@@ -465,7 +481,7 @@ class DedicatedTuStorage<T extends TM3Data>  extends TuStorage<T> {
             .append(" AND (select srcLocaleId from ")
             .append(getStorage().getTuTableName())
             .append(" WHERE id = tuId) != localeId");
-        SQLUtil.exec(getConnection(), sb);
+        SQLUtil.exec(getSession(), sb);
     }
     
     // 
@@ -498,7 +514,7 @@ class DedicatedTuStorage<T extends TM3Data>  extends TuStorage<T> {
               .append(" = ?")
               .addValues(e.getValue());
         }
-        return SQLUtil.execCountQuery(getConnection(), sb);
+        return SQLUtil.execCountQuery(getSession(), sb);
     }
 
     @Override
@@ -529,7 +545,7 @@ class DedicatedTuStorage<T extends TM3Data>  extends TuStorage<T> {
               .append(" = ?")
               .addValues(e.getValue());
         }
-        return SQLUtil.execCountQuery(getConnection(), sb);
+        return SQLUtil.execCountQuery(getSession(), sb);
     }
     
     //
@@ -556,7 +572,7 @@ class DedicatedTuStorage<T extends TM3Data>  extends TuStorage<T> {
                 .append(" WHERE id > ? ORDER BY id ASC LIMIT ?")
                 .addValues(startId, count);
         }
-        return getTu(SQLUtil.execIdsQuery(getConnection(), sb), false);
+        return getTu(SQLUtil.execIdsQuery(getSession(), sb), false);
     }
     
     @Override
@@ -580,7 +596,7 @@ class DedicatedTuStorage<T extends TM3Data>  extends TuStorage<T> {
               .append(" WHERE localeId = ? AND tuId > ? ORDER BY tuId ASC LIMIT ?")
               .addValues(locale.getId(), startId, count);
         }
-        return getTu(SQLUtil.execIdsQuery(getConnection(), sb), false);
+        return getTu(SQLUtil.execIdsQuery(getSession(), sb), false);
     }
 
     @Override
@@ -619,12 +635,12 @@ class DedicatedTuStorage<T extends TM3Data>  extends TuStorage<T> {
         } else {
             sb.append(" ORDER BY tu.id ASC LIMIT ?").addValues(count);
         }
-        return getTu(SQLUtil.execIdsQuery(getConnection(), sb), false);
+        return getTu(SQLUtil.execIdsQuery(getSession(), sb), false);
     }
     
     @Override
     public Set<TM3Locale> getTuvLocales() throws SQLException {
-        return loadLocales(SQLUtil.execIdsQuery(getConnection(), 
+        return loadLocales(SQLUtil.execIdsQuery(getSession(), 
             new StatementBuilder()
                 .append("SELECT DISTINCT(localeId) FROM ")
                 .append(getStorage().getTuvTableName())
@@ -635,7 +651,7 @@ class DedicatedTuStorage<T extends TM3Data>  extends TuStorage<T> {
     public List<Object> getAllAttrValues(TM3Attribute attr) 
             throws SQLException {
         if (attr.isInline()) {
-            return SQLUtil.execObjectsQuery(getConnection(),
+            return SQLUtil.execObjectsQuery(getSession(),
               new StatementBuilder()
                 .append("SELECT DISTINCT(")
                 .append(attr.getColumnName())
@@ -644,7 +660,7 @@ class DedicatedTuStorage<T extends TM3Data>  extends TuStorage<T> {
                 .append(" WHERE ")
                 .append(attr.getColumnName()).append(" IS NOT NULL"));
         } else {
-            return SQLUtil.execObjectsQuery(getConnection(),
+            return SQLUtil.execObjectsQuery(getSession(),
               new StatementBuilder()
                 .append("SELECT DISTINCT(value) FROM ")
                 .append(getStorage().getAttrValTableName())

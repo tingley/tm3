@@ -11,6 +11,7 @@ import java.util.List;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
+import org.hibernate.jdbc.Work;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import static org.junit.Assert.*;
@@ -26,26 +27,33 @@ public class TestDistributedIds {
     public static void init() throws Exception {
         sessionFactory = TM3Tests.setupHibernate();
         Session session = sessionFactory.openSession();
-        Connection conn = session.connection();
-        Statement s = conn.createStatement();
-        s.execute("DELETE FROM TM3_ID where tableName in ('id1', 'testMultipleThreads')");
-        s.close();
+        session.doWork(new Work() {
+            @Override
+            public void execute(Connection conn) throws SQLException {
+                Statement s = conn.createStatement();
+                s.execute("DELETE FROM TM3_ID where tableName in ('id1', 'testMultipleThreads')");
+                s.close();
+            }
+        });
         session.close();
     }
     
     @Test
     public void testDistributedIds() throws Exception {
-        Session session = null;
+        final Session session = sessionFactory.openSession();
         try {
-            session = sessionFactory.openSession();
-            Connection conn = session.connection();
-            DistributedId id1 = new DistributedId("id1", 100);
-            // Get some ids
-            for (int i = 1; i <= 1000; i++) {
-                long next = id1.getId(conn);
-                assertEquals(i, next);
-            }
-            id1.destroy(conn);
+            session.doWork(new Work() {
+                @Override
+                public void execute(Connection conn) throws SQLException {
+                    DistributedId id1 = new DistributedId("id1", 100);
+                    // Get some ids
+                    for (int i = 1; i <= 1000; i++) {
+                        long next = id1.getId(session );
+                        assertEquals(i, next);
+                    }
+                    id1.destroy(conn);
+                }
+            });
         }
         catch (Exception e) {
             throw e;
@@ -87,7 +95,12 @@ public class TestDistributedIds {
             }
         }
         Session session = sessionFactory.openSession();
-        new DistributedId("testMultipleThreads").destroy(session.connection());
+        session.doWork(new Work() {
+            @Override
+            public void execute(Connection conn) throws SQLException {
+                new DistributedId("testMultipleThreads").destroy(conn);
+            }
+        });
     }
     
     static class IDFetcher implements Runnable {
@@ -107,9 +120,8 @@ public class TestDistributedIds {
         public void run() {
             Session session = sessionFactory.openSession();
             try {
-                Connection conn = session.connection();
                 for (int i = 0; i < count; i++) {
-                    int next = (int)id.getId(conn);
+                    int next = (int)id.getId(session);
                     if (values[next-1] != -1) {
                         fail("(Thread " + self + "): values[" + next + 
                              "] already written by thread " + values[self]);

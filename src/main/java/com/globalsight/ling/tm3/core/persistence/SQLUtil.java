@@ -9,6 +9,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.log4j.Logger;
+import org.hibernate.Session;
+import org.hibernate.jdbc.ReturningWork;
+import org.hibernate.jdbc.Work;
 
 /**
  * Simple routines to simplify common SQL tasks.
@@ -26,15 +29,20 @@ public class SQLUtil {
     /**
      * Return the ID of the last auto_inc field incremented in this connection.
      */
-    public static long getLastInsertId(Connection conn) throws SQLException {
-        PreparedStatement ps = conn.prepareStatement("SELECT LAST_INSERT_ID()");
-        logStatement(findLabel(), "SELECT LAST_INSERT_ID()");
-        ResultSet rs = SQLUtil.execQuery(ps);
-        rs.next();
-        long l = rs.getLong(1);
-        ps.close();
-        log("LAST_INSERT_ID is " + l);
-        return l;
+    public static long getLastInsertId(Session session) throws SQLException {
+        return session.doReturningWork(new ReturningWork<Long>() {
+            @Override
+            public Long execute(Connection conn) throws SQLException {
+                PreparedStatement ps = conn.prepareStatement("SELECT LAST_INSERT_ID()");
+                logStatement(findLabel(), "SELECT LAST_INSERT_ID()");
+                ResultSet rs = SQLUtil.execQuery(ps);
+                rs.next();
+                long l = rs.getLong(1);
+                ps.close();
+                log("LAST_INSERT_ID is " + l);
+                return l;
+            }
+        });
     }
     
     /**
@@ -99,48 +107,59 @@ public class SQLUtil {
      * Executes a query that whose ResultSet returns a single column
      * containing a long.  Return the row results as a List.
      */
-    public static List<Long> execIdsQuery(Connection conn, StatementBuilder sb) 
+    public static List<Long> execIdsQuery(Session session, StatementBuilder sb) 
                         throws SQLException {
-        return execIdsQuery(conn, sb, findLabel());
+        return execIdsQuery(session, sb, findLabel());
     }
     
-    public static List<Long> execIdsQuery(Connection conn, StatementBuilder sb, 
+    public static List<Long> execIdsQuery(Session session, final StatementBuilder sb, 
                         String label) throws SQLException {
         logStatement(label, sb);
-        PreparedStatement ps = sb.toPreparedStatement(conn);
-        Timer t = new Timer();
-        ResultSet rs = ps.executeQuery();
-        List<Long> ids = new ArrayList<Long>();
-        while (rs.next()) {
-            ids.add(rs.getLong(1));
-        }
-        ps.close();
-        logTimer(t);
-        return ids;
+        return session.doReturningWork(new ReturningWork<List<Long>>() {
+            @Override
+            public List<Long> execute(Connection conn) throws SQLException {
+                PreparedStatement ps = sb.toPreparedStatement(conn);
+                Timer t = new Timer();
+                ResultSet rs = ps.executeQuery();
+                List<Long> ids = new ArrayList<Long>();
+                while (rs.next()) {
+                    ids.add(rs.getLong(1));
+                }
+                ps.close();
+                logTimer(t);
+                return ids;
+            }
+        });
     }
     
     /**
      * Executes a query that whose ResultSet returns a single column.
      * Return the row results as a List.
      */
-    public static List<Object> execObjectsQuery(Connection conn, StatementBuilder sb) 
+    public static List<Object> execObjectsQuery(Session session, StatementBuilder sb) 
                         throws SQLException {
-        return execObjectsQuery(conn, sb, findLabel());
+        return execObjectsQuery(session, sb, findLabel());
     }
     
-    public static List<Object> execObjectsQuery(Connection conn, StatementBuilder sb, 
+    public static List<Object> execObjectsQuery(Session session, final StatementBuilder sb, 
                         String label) throws SQLException {
         logStatement(label, sb);
-        PreparedStatement ps = sb.toPreparedStatement(conn);
-        Timer t = new Timer();
-        ResultSet rs = ps.executeQuery();
-        List<Object> ids = new ArrayList<Object>();
-        while (rs.next()) {
-            ids.add(rs.getObject(1));
-        }
-        ps.close();
-        logTimer(t);
-        return ids;
+        return session.doReturningWork(new ReturningWork<List<Object>>() {
+
+            @Override
+            public List<Object> execute(Connection conn) throws SQLException {
+                PreparedStatement ps = sb.toPreparedStatement(conn);
+                Timer t = new Timer();
+                ResultSet rs = ps.executeQuery();
+                List<Object> ids = new ArrayList<Object>();
+                while (rs.next()) {
+                    ids.add(rs.getObject(1));
+                }
+                ps.close();
+                logTimer(t);
+                return ids;
+            }
+        });
     }
     
     /**
@@ -148,24 +167,29 @@ public class SQLUtil {
      * of a single column containing a long.  Return this value as a long.
      * @return single row value, or 0 if no results were returned
      */
-    public static long execCountQuery(Connection conn, StatementBuilder sb) 
+    public static long execCountQuery(Session session, StatementBuilder sb) 
                         throws SQLException {
-        return execCountQuery(conn, sb, findLabel());
+        return execCountQuery(session, sb, findLabel());
     }
     
-    public static long execCountQuery(Connection conn, StatementBuilder sb, 
+    public static long execCountQuery(Session session, final StatementBuilder sb, 
                         String label) throws SQLException {
         logStatement(label, sb);
-        PreparedStatement ps = sb.toPreparedStatement(conn);
-        Timer t = new Timer();
-        ResultSet rs = ps.executeQuery();
-        long count = 0;
-        if (rs.next()) {
-            count = rs.getLong(1);
-        }
-        ps.close();
-        logTimer(t);
-        return count;
+        return session.doReturningWork(new ReturningWork<Long>() {
+            @Override
+            public Long execute(Connection conn) throws SQLException {
+                PreparedStatement ps = sb.toPreparedStatement(conn);
+                Timer t = new Timer();
+                ResultSet rs = ps.executeQuery();
+                long count = 0;
+                if (rs.next()) {
+                    count = rs.getLong(1);
+                }
+                ps.close();
+                logTimer(t);
+                return count;
+            }
+        }).longValue();
     }
     
     /**
@@ -175,20 +199,25 @@ public class SQLUtil {
      * @param sb
      * @throws SQLException
      */
-    public static void execBatch(Connection conn, BatchStatementBuilder sb) 
+    public static void execBatch(Session session, BatchStatementBuilder sb) 
                 throws SQLException { 
-        execBatch(conn, sb, findLabel());
+        execBatch(session, sb, findLabel());
     }
     
-    public static void execBatch(Connection conn, BatchStatementBuilder sb, String label) 
+    public static void execBatch(Session session, final BatchStatementBuilder sb, String label) 
             throws SQLException {
         sb.setRequestKeys(false);
         logStatement(label, sb);
-        PreparedStatement ps = sb.toPreparedStatement(conn);
-        Timer t = new Timer();
-        ps.executeBatch();
-        logTimer(t);
-        ps.close();
+        session.doWork(new Work() {
+            @Override
+            public void execute(Connection conn) throws SQLException {
+            PreparedStatement ps = sb.toPreparedStatement(conn);
+            Timer t = new Timer();
+            ps.executeBatch();
+            logTimer(t);
+            ps.close();
+            }
+        });
     }
     
     /**
@@ -198,9 +227,9 @@ public class SQLUtil {
      * @param sb
      * @throws SQLException
      */
-    public static void exec(Connection conn, AbstractStatementBuilder sb) 
+    public static void exec(Session session, AbstractStatementBuilder sb) 
                         throws SQLException {
-        exec(conn, sb, findLabel());
+        exec(session, sb, findLabel());
     }
     
     /**
@@ -211,9 +240,19 @@ public class SQLUtil {
      * @param label
      * @throws SQLException
      */
-    public static void exec(Connection conn, AbstractStatementBuilder sb, 
+    public static void exec(Session session, final AbstractStatementBuilder sb, 
                         String label) throws SQLException {
         logStatement(label, sb);
+        session.doWork(new Work() {
+            @Override
+            public void execute(Connection conn) throws SQLException {
+                exec(conn, sb);
+            }
+        });
+    }
+    
+    public static void exec(Connection conn, AbstractStatementBuilder sb)
+                        throws SQLException {
         PreparedStatement ps = sb.toPreparedStatement(conn);
         Timer t = new Timer();
         ps.execute();

@@ -5,6 +5,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
+import org.hibernate.jdbc.Work;
+
 import com.globalsight.ling.tm3.core.persistence.DistributedId;
 import com.globalsight.ling.tm3.core.persistence.SQLUtil;
 import com.globalsight.ling.tm3.core.persistence.StatementBuilder;
@@ -29,7 +31,12 @@ class MultilingualSharedStorageInfo<T extends TM3Data> extends StorageInfo<T> {
     public void create() throws SQLException {
         initializeTm();
         // Shared TMs still have a dedicated fuzzy index
-        createFuzzyIndex(getSession().connection());
+        getSession().doWork(new Work() {
+            @Override
+            public void execute(Connection conn) throws SQLException {
+                createFuzzyIndex(conn);
+            }
+        });
     }
     
     /**
@@ -42,24 +49,27 @@ class MultilingualSharedStorageInfo<T extends TM3Data> extends StorageInfo<T> {
      */
     @Override
     public void destroy() throws SQLException {
-        Connection conn = getSession().connection();
-        
-        destroyFuzzyIndex(conn);
-        // Although we could just cascade everything from the tu table,
-        // it's faster to use the index on tmId to delete in bulk from each 
-        // table
-        SQLUtil.exec(conn, new StatementBuilder()
-            .append("delete from ").append(getAttrValTableName())
-            .append(" where tmId = ?").addValue(getTm().getId())
-        );
-        SQLUtil.exec(conn, new StatementBuilder()
-            .append("delete from ").append(getTuvTableName())
-            .append(" where tmId = ?").addValue(getTm().getId())
-        );
-        SQLUtil.exec(conn, new StatementBuilder()
-            .append("delete from ").append(getTuTableName())
-            .append(" where tmId = ?").addValue(getTm().getId())
-        );
+        getSession().doWork(new Work() {
+            @Override
+            public void execute(Connection conn) throws SQLException {
+                destroyFuzzyIndex(conn);
+                // Although we could just cascade everything from the tu table,
+                // it's faster to use the index on tmId to delete in bulk from each 
+                // table
+                SQLUtil.exec(conn, new StatementBuilder()
+                    .append("delete from ").append(getAttrValTableName())
+                    .append(" where tmId = ?").addValue(getTm().getId())
+                );
+                SQLUtil.exec(conn, new StatementBuilder()
+                    .append("delete from ").append(getTuvTableName())
+                    .append(" where tmId = ?").addValue(getTm().getId())
+                );
+                SQLUtil.exec(conn, new StatementBuilder()
+                    .append("delete from ").append(getTuTableName())
+                    .append(" where tmId = ?").addValue(getTm().getId())
+                );
+            }
+        });
     }
    
     @Override

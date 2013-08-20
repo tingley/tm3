@@ -34,7 +34,7 @@ class BilingualFuzzyIndex<T extends TM3Data>
             sb.addBatch(fp, tuv.getId(), tuv.getTu().getId(), 
                         tuvCount, tuv.isSource());
         }
-        SQLUtil.execBatch(getConnection(), sb);
+        SQLUtil.execBatch(getSession(), sb);
     }
 
     @Override
@@ -43,7 +43,7 @@ class BilingualFuzzyIndex<T extends TM3Data>
         sb.append("DELETE FROM ")
           .append(getStorage().getFuzzyIndexTableName())
           .append(" WHERE tuvId = ?").addValue(tuv.getId());
-        SQLUtil.exec(getConnection(), sb);
+        SQLUtil.exec(getSession(), sb);
     }
 
     @Override

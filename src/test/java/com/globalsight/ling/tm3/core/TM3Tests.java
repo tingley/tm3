@@ -25,7 +25,6 @@ import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
 import org.hibernate.cfg.Configuration;
-import org.junit.After;
 import org.junit.Test;
 
 import com.globalsight.ling.tm3.core.persistence.HibernateConfig;
@@ -705,12 +704,10 @@ public abstract class TM3Tests {
             TM3LeverageResults<TestData> results;
 
             // Now let's do an exact match query
-            currentTransaction = currentSession.beginTransaction();
             verifyExact(tm, srcData1, srcLocale, tgtData1, tgtLocale, false);
             verifyExact(tm, srcData2, srcLocale, tgtData2, tgtLocale, false);
 
              // lookupTarget still looks in source
-            currentTransaction = currentSession.beginTransaction();
             verifyExact(tm, srcData1, srcLocale, tgtData1, tgtLocale, true);
             verifyExact(tm, srcData2, srcLocale, tgtData2, tgtLocale, true);
 
@@ -733,8 +730,6 @@ public abstract class TM3Tests {
                tgtData1, srcLocale, null, null, TM3MatchType.EXACT, true);
             expectResults(results);
 
-            currentTransaction.commit();
-
             cleanupTestDb(manager);
         }
         catch (Exception e) {
@@ -756,7 +751,6 @@ public abstract class TM3Tests {
             currentTransaction.commit();
             
             // Now let's do an exact match query
-            currentTransaction = currentSession.beginTransaction();
             verifyExact(tm, srcData1, srcLocale, tgtData1, tgtLocale, false);
 
             cleanupTestDb(manager);
@@ -1556,7 +1550,6 @@ public abstract class TM3Tests {
             currentTransaction.commit();
             
             // Now make sure it persisted
-            currentTransaction = currentSession.beginTransaction();
             results = tm.findMatches(key, srcLocale, null, null, TM3MatchType.EXACT, false);
             assertEquals(1, results.getMatches().size());
             tu = results.getMatches().first().getTu();
@@ -1679,7 +1672,6 @@ public abstract class TM3Tests {
             currentTransaction.commit();
             
             // Now make sure it persisted
-            currentTransaction = currentSession.beginTransaction();
             results = tm.findMatches(srcData2, srcLocale, null, null, TM3MatchType.EXACT, false);
             assertEquals(1, results.getMatches().size());
             tu = results.getMatches().first().getTu();
