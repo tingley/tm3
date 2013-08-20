@@ -58,7 +58,7 @@ abstract class TuStorage<T extends TM3Data> {
      * @param tu
      * @throws SQLException 
      */
-    public abstract void saveTu(Session session, TM3Tu<T> tu)
+    public abstract void saveTu(TM3Tu<T> tu)
                         throws SQLException;
     
     /**
@@ -273,8 +273,8 @@ OUTER:  for (FuzzyCandidate<T> candidate : candidates) {
     protected abstract void loadAttrs(List<Long> tuIds, List<TuData<T>> data, boolean locking)
                     throws SQLException;
 
-    protected TM3Attribute getAttributeById(Session session, long id) {
-        return (TM3Attribute)session.get(TM3Attribute.class, id);
+    protected TM3Attribute getAttributeById(long id) {
+        return (TM3Attribute)getSession().get(TM3Attribute.class, id);
     }    
   
     protected TM3Tuv<T> createTuv(TuvData<T> rawData) {
@@ -343,7 +343,7 @@ OUTER:  for (FuzzyCandidate<T> candidate : candidates) {
         }
     }
         
-    public List<TM3Tuv<T>> getExactMatches(Session session, T key, 
+    public List<TM3Tuv<T>> getExactMatches(T key, 
            TM3Locale keyLocale, Set<? extends TM3Locale> matchLocales,
            Map<TM3Attribute, Object> inlineAttributes,
            Map<TM3Attribute, String> customAttributes,

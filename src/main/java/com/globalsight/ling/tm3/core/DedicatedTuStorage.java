@@ -6,20 +6,15 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
 import java.util.Set;
 
-import org.hibernate.Session;
 import org.hibernate.jdbc.ReturningWork;
 import org.hibernate.jdbc.Work;
 
-import com.globalsight.ling.tm3.core.TuStorage.TuData;
-import com.globalsight.ling.tm3.core.TuStorage.TuvData;
 import com.globalsight.ling.tm3.core.persistence.BatchStatementBuilder;
 import com.globalsight.ling.tm3.core.persistence.SQLUtil;
 import com.globalsight.ling.tm3.core.persistence.StatementBuilder;
@@ -37,8 +32,8 @@ class DedicatedTuStorage<T extends TM3Data>  extends TuStorage<T> {
      * @throws SQLException 
      */
     @Override
-    public void saveTu(Session session, TM3Tu<T> tu) throws SQLException {
-        tu.setId(getStorage().getTuId(session));
+    public void saveTu(TM3Tu<T> tu) throws SQLException {
+        tu.setId(getStorage().getTuId(getSession()));
         Map<TM3Attribute, Object> inlineAttributes =
             BaseTm.getInlineAttributes(tu.getAttributes());
         Map<TM3Attribute, String> customAttributes =
@@ -55,7 +50,7 @@ class DedicatedTuStorage<T extends TM3Data>  extends TuStorage<T> {
             sb.append(", ?").addValue(e.getValue());
         }
         sb.append(")");
-        SQLUtil.exec(session, sb);
+        SQLUtil.exec(getSession(), sb);
         addTuvs(tu, tu.getAllTuv());
         saveCustomAttributes(tu.getId(), customAttributes);
     }
@@ -281,14 +276,13 @@ class DedicatedTuStorage<T extends TM3Data>  extends TuStorage<T> {
 
                 Iterator<TuData<T>> tus = data.iterator();
                 TuData<T> current = null;
-                Session session = getStorage().getTm().getSession();
                 while (rs.next()) {
                     long tuId = rs.getLong(1);
                     current = advanceToTu(current, tus, tuId);
                     if (current == null) {
                         throw new IllegalStateException("Couldn't find tuId for " + tuId);
                     }
-                    current.attrs.put(getAttributeById(session, rs.getLong(2)), 
+                    current.attrs.put(getAttributeById(rs.getLong(2)), 
                                       rs.getString(3));
                 }
                 ps.close();            

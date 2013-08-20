@@ -14,7 +14,7 @@ import java.util.TreeSet;
 
 import org.apache.log4j.Logger;
 import org.hibernate.HibernateException;
-import org.hibernate.LockMode;
+import org.hibernate.LockOptions;
 import org.hibernate.Session;
 import org.hibernate.criterion.Order;
 import org.hibernate.criterion.Restrictions;
@@ -33,7 +33,7 @@ abstract class BaseTm<T extends TM3Data> implements TM3Tm<T> {
     private Set<TM3Attribute> attributes = new HashSet<TM3Attribute>();
 
     // Injected
-    private TM3Manager manager;
+    private TM3Manager<T> manager;
     private Session session;
     private TM3DataFactory<T> factory;
     private boolean indexTarget = false;
@@ -100,11 +100,11 @@ abstract class BaseTm<T extends TM3Data> implements TM3Tm<T> {
         this.attrValTableName = name;
     }
         
-    TM3Manager getManager() {
+    TM3Manager<T> getManager() {
         return manager;
     }
   
-    void setManager(TM3Manager manager) {
+    void setManager(TM3Manager<T> manager) {
         this.manager = manager;
     }
     
@@ -222,19 +222,19 @@ abstract class BaseTm<T extends TM3Data> implements TM3Tm<T> {
         try {
             switch (matchType) {
             case EXACT:
-                getExactMatches(session, results, matchKey, keyLocale, matchLocales, inlineAttributes, customAttributes, maxResults, lookupTarget);
+                getExactMatches(results, matchKey, keyLocale, matchLocales, inlineAttributes, customAttributes, maxResults, lookupTarget);
                 break;
             case ALL:
-                count = getExactMatches(session, results, matchKey, keyLocale, matchLocales, inlineAttributes, customAttributes, maxResults, lookupTarget);
+                count = getExactMatches(results, matchKey, keyLocale, matchLocales, inlineAttributes, customAttributes, maxResults, lookupTarget);
                 if (count < maxResults) {
-                    getFuzzyMatches(session, results, matchKey, keyLocale,
+                    getFuzzyMatches(results, matchKey, keyLocale,
                                 matchLocales, inlineAttributes, customAttributes, maxResults, threshold, lookupTarget);
                 }
                 break;
             case FALLBACK:
-                count = getExactMatches(session, results, matchKey, keyLocale, matchLocales, inlineAttributes, customAttributes, maxResults, lookupTarget);
+                count = getExactMatches(results, matchKey, keyLocale, matchLocales, inlineAttributes, customAttributes, maxResults, lookupTarget);
                 if (count == 0) {
-                    getFuzzyMatches(session, results, matchKey, keyLocale,
+                    getFuzzyMatches(results, matchKey, keyLocale,
                                         matchLocales, inlineAttributes, customAttributes, maxResults, threshold, lookupTarget);
                 }
                 break;
@@ -245,8 +245,7 @@ abstract class BaseTm<T extends TM3Data> implements TM3Tm<T> {
         return results;
     }
 
-    protected int getExactMatches(Session session,
-            TM3LeverageResults<T> results,
+    protected int getExactMatches(TM3LeverageResults<T> results,
             T matchKey, TM3Locale keyLocale,
             Set<? extends TM3Locale> matchLocales,
             Map<TM3Attribute, Object> inlineAttributes,
@@ -257,7 +256,7 @@ abstract class BaseTm<T extends TM3Data> implements TM3Tm<T> {
         int count = 0;
         long start = System.currentTimeMillis();
         List<TM3Tuv<T>> exactTuv = getStorageInfo().getTuStorage()
-            .getExactMatches(session, matchKey, keyLocale,
+            .getExactMatches(matchKey, keyLocale,
                          matchLocales, inlineAttributes, customAttributes, lookupTarget, false);
         for (TM3Tuv<T> exactMatch : exactTuv) {
             if (count++ >= maxResults) {
@@ -276,8 +275,7 @@ abstract class BaseTm<T extends TM3Data> implements TM3Tm<T> {
         return count;
     }
     
-    protected void getFuzzyMatches(Session session,
-            TM3LeverageResults<T> results, T matchKey,
+    protected void getFuzzyMatches(TM3LeverageResults<T> results, T matchKey,
             TM3Locale keyLocale, Set<? extends TM3Locale> matchLocales,
             Map<TM3Attribute, Object> inlineAttributes,
             Map<TM3Attribute, String> customAttributes,
@@ -400,7 +398,7 @@ abstract class BaseTm<T extends TM3Data> implements TM3Tm<T> {
                 // NB This will find earlier TUs from this call, because the
                 // storage layer writes them straight the the database, not
                 // via the Hibernate cache (which would need to be flushed).
-                TM3Tu<T> tu = findTuForSave(session, tuData.srcTuv.content, 
+                TM3Tu<T> tu = findTuForSave(tuData.srcTuv.content, 
                         tuData.srcTuv.locale, inlineAttributes, customAttributes);
                 if (tu == null) {
                     tu = tuStorage.createTu(tuData.srcTuv.locale, 
@@ -409,7 +407,7 @@ abstract class BaseTm<T extends TM3Data> implements TM3Tm<T> {
                     for (TM3Saver<T>.Tuv tuvData : tuData.targets) {
                         tu.addTargetTuv(tuvData.locale, tuvData.content, tuvData.event);
                     }
-                    tuStorage.saveTu(session, tu);
+                    tuStorage.saveTu(tu);
                     getStorageInfo().getFuzzyIndex().index(tu.getSourceTuv());
                     if (indexTarget) {
                         for (TM3Tuv<T> tuv : tu.getTargetTuvs()) {
@@ -482,7 +480,7 @@ abstract class BaseTm<T extends TM3Data> implements TM3Tm<T> {
      * filtering step is required to check the upper bound.  The easiest
      * way to do this is just compared the attribute counts.
      */
-    private TM3Tu<T> findTuForSave(Session session, T source,
+    private TM3Tu<T> findTuForSave(T source,
             TM3Locale srcLocale,
             Map<TM3Attribute, Object> inlineAttributes,
             Map<TM3Attribute, String> customAttributes)
@@ -496,7 +494,7 @@ abstract class BaseTm<T extends TM3Data> implements TM3Tm<T> {
             }
         }
         List<TM3Tuv<T>> tuvs = getStorageInfo().getTuStorage()
-                .getExactMatches(session, source, srcLocale, null,
+                .getExactMatches(source, srcLocale, null,
                                  identityAffectingInlineAttributes,
                                  customAttributes, false, true);
         List<TM3Tuv<T>> filtered = new ArrayList<TM3Tuv<T>>();
@@ -768,7 +766,7 @@ abstract class BaseTm<T extends TM3Data> implements TM3Tm<T> {
     }
 
     void lockForWrite() throws TM3Exception {
-        session.lock(this, LockMode.UPGRADE);
+        session.buildLockRequest(LockOptions.UPGRADE).lock(this);
     }
 
     // TODO: on save, check that all required attrs are present

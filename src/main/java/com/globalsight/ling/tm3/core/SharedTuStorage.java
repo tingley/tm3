@@ -4,16 +4,13 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.hibernate.Session;
 import org.hibernate.jdbc.ReturningWork;
 import org.hibernate.jdbc.Work;
 
@@ -186,14 +183,13 @@ class SharedTuStorage<T extends TM3Data> extends TuStorage<T> {
 
                 Iterator<TuData<T>> tus = data.iterator();
                 TuData<T> current = null;
-                Session session = getStorage().getTm().getSession();
                 while (rs.next()) {
                     long tuId = rs.getLong(1);
                     current = advanceToTu(current, tus, tuId);
                     if (current == null) {
                         throw new IllegalStateException("Couldn't find tuId for " + tuId);
                     }
-                    current.attrs.put(getAttributeById(session, rs.getLong(2)), 
+                    current.attrs.put(getAttributeById(rs.getLong(2)), 
                                       rs.getString(3));
                 }
                 ps.close();
@@ -308,9 +304,9 @@ class SharedTuStorage<T extends TM3Data> extends TuStorage<T> {
     }
 
     @Override
-    public void saveTu(Session session, TM3Tu<T> tu)
+    public void saveTu(TM3Tu<T> tu)
             throws SQLException {
-        tu.setId(getStorage().getTuId(session));
+        tu.setId(getStorage().getTuId(getSession()));
         Map<TM3Attribute, Object> inlineAttributes =
             BaseTm.getInlineAttributes(tu.getAttributes());
         Map<TM3Attribute, String> customAttributes =

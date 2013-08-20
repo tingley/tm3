@@ -59,7 +59,6 @@ public class DefaultManager<T extends TM3Data> implements TM3Manager<T> {
         }
     }
 
-    @SuppressWarnings("unchecked")
     public TM3BilingualTm<T> getBilingualTm(
             TM3DataFactory<T> factory, long id) 
             throws TM3Exception {
@@ -158,7 +157,7 @@ public class DefaultManager<T extends TM3Data> implements TM3Manager<T> {
         }
     }
     
-    private <T extends TM3Data, K extends BaseTm<T>> K init(K tm, 
+    private <K extends BaseTm<T>> K init(K tm, 
             Set<TM3Attribute> inlineAttributes)
             throws SQLException, HibernateException {
         tm.setManager(this);
@@ -173,7 +172,7 @@ public class DefaultManager<T extends TM3Data> implements TM3Manager<T> {
         return tm;
     }
     
-    private <T extends TM3Data, V extends BaseTm<T>> V injectTm(
+    private <V extends BaseTm<T>> V injectTm(
                     V tm, TM3DataFactory<T> factory) {
         tm.setDataFactory(factory);
         tm.setSession(session);
