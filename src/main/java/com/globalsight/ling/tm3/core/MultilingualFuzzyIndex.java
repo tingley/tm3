@@ -61,13 +61,6 @@ class MultilingualFuzzyIndex<T extends TM3Data> extends FuzzyIndex<T> {
             sb.append(" OR idx.fingerprint = ?").addValue(fingerprints.get(i));
         }
         sb.append(")");
-        // Add minimum and max bounds on the data length
-        int min = fingerprints.size() / 3;
-        int max = fingerprints.size() * 3;
-        if (min > 0) {
-            sb.append(" AND idx.tuvCount > ?").addValue(min);
-        }
-        sb.append(" AND idx.tuvCount < ?").addValue(max);
         sb.append(" AND idx.localeId = ?").addValue(keyLocale.getId());
         if (! lookupTarget) {
             sb.append(" AND isSource = 1");
@@ -79,6 +72,13 @@ class MultilingualFuzzyIndex<T extends TM3Data> extends FuzzyIndex<T> {
                 sb.addValue(e.getValue());
             }
         }
+        // Add minimum and max bounds on the data length
+        int min = fingerprints.size() / 3;
+        int max = fingerprints.size() * 3;
+        if (min > 0) {
+            sb.append(" AND idx.tuvCount > ?").addValue(min);
+        }
+        sb.append(" AND idx.tuvCount < ?").addValue(max);
         sb.append(" GROUP BY tuvId ORDER BY score DESC");
         if (matchLocales != null) {
             // an exists subselect seems simpler, but mysql bug 46947 causes

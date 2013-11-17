@@ -515,6 +515,7 @@ class SharedTuStorage<T extends TM3Data> extends TuStorage<T> {
               .append("TM3_EVENTS as event ");
             getStorage().attributeJoinFilter(sb, "tuv.tuId", customAttrs);
             sb.append("WHERE tuv.tmId = ? ").addValue(tmId)
+              .append("AND tuv.tuId = tu.id")
               .append("AND tuv.lastEventId = event.id ")
               .append("AND event.time >= ? AND event.time <= ? ")
               .addValues(start, end);
@@ -524,7 +525,8 @@ class SharedTuStorage<T extends TM3Data> extends TuStorage<T> {
               .append(getStorage().getTuvTableName()).append(" as tuv, ")
               .append(getStorage().getTuTableName()).append(" as tu ");
             getStorage().attributeJoinFilter(sb, "tuv.tuId", customAttrs);
-            sb.append(" WHERE tuv.tmId = ?").addValue(tmId);
+            sb.append(" WHERE tuv.tmId = ?").addValue(tmId)
+              .append(" AND tuv.tuId = tu.id");
         }
         for (Map.Entry<TM3Attribute, Object> e : inlineAttrs.entrySet()) {
             sb.append(" AND tu.").append(e.getKey().getColumnName())

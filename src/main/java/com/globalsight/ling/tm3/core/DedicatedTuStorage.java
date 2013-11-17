@@ -524,6 +524,7 @@ class DedicatedTuStorage<T extends TM3Data>  extends TuStorage<T> {
               .append("TM3_EVENTS as event ");
             getStorage().attributeJoinFilter(sb, "tuv.tuId", customAttrs);
             sb.append(" WHERE tuv.lastEventId = event.id ")
+              .append("AND tuv.tuId = tu.id")
               .append("AND event.time >= ? AND event.time <= ? ")
               .addValues(start, end);
         }
@@ -532,7 +533,7 @@ class DedicatedTuStorage<T extends TM3Data>  extends TuStorage<T> {
               .append(getStorage().getTuvTableName()).append(" as tuv, ")
               .append(getStorage().getTuTableName()).append(" as tu ");
               getStorage().attributeJoinFilter(sb, "tuv.tuId", customAttrs);
-              sb.append(" WHERE 1");
+              sb.append(" WHERE tuv.tuId = tu.id");
         }
         for (Map.Entry<TM3Attribute, Object> e : inlineAttrs.entrySet()) {
             sb.append(" AND tu.").append(e.getKey().getColumnName())
